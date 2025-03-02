@@ -3,7 +3,7 @@
 仅仅作为一些想法的阐述，同时也合并了一些OpenGFW的PR。
 Brutal和hysteria2部分请勿使用，看看就好。
 
-[![Quality check status](https://github.com/uQUIC/XGFW/actions/workflows/check.yaml/badge.svg)](https://github.com/uQUIC/XGFW/actions/workflows/check.yaml)
+[![Quality check status](https://github.com/v2TLS/XGFW/actions/workflows/check.yaml/badge.svg)](https://github.com/v2TLS/XGFW/actions/workflows/check.yaml)
 
 [1]: https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg
 
