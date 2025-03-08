@@ -1,4 +1,4 @@
-module github.com/uQUIC/XGFW
+module github.com/v2TLS/XGFW
 
 go 1.21
 
