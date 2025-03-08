@@ -6,7 +6,7 @@ import (
     "strings"
     "time"
 
-    "github.com/uQUIC/XGFW/operation/protocol"
+    "github.com/v2TLS/XGFW/operation/protocol"
 )
 
 // FETQoSAnalyzer 实现带QoS的全加密流量分析器
