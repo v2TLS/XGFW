@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/uQUIC/XGFW/operation/protocol"
-	"github.com/uQUIC/XGFW/operation/protocol/utils"
+	"github.com/v2TLS/XGFW/operation/protocol"
+	"github.com/v2TLS/XGFW/operation/protocol/utils"
 )
 
 var _ analyzer.TCPAnalyzer = (*HTTPAnalyzer)(nil)
