@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/uQUIC/XGFW/io"
-	"github.com/uQUIC/XGFW/ruleset"
+	"github.com/v2TLS/XGFW/io"
+	"github.com/v2TLS/XGFW/ruleset"
 )
 
 // Engine is the main engine for OpenGFW.
