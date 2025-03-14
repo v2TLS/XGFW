@@ -1,8 +1,8 @@
 package tcp
 
 import (
-	"github.com/uQUIC/XGFW/operation/protocol"
-	"github.com/uQUIC/XGFW/ruleset/builtins/tor"
+	"github.com/v2TLS/XGFW/operation/protocol"
+	"github.com/v2TLS/XGFW/ruleset/builtins/tor"
 )
 
 var _ analyzer.TCPAnalyzer = (*TorAnalyzer)(nil)
