@@ -6,7 +6,7 @@ import (
     "strconv"
     "time"
 
-    "github.com/uQUIC/XGFW/operation/protocol"
+    "github.com/v2TLS/XGFW/operation/protocol"
 )
 
 // QUICQoSAnalyzer 实现带QoS的QUIC分析器

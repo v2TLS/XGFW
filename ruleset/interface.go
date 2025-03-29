@@ -5,9 +5,9 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/uQUIC/XGFW/operation/protocol"
-	"github.com/uQUIC/XGFW/modifier"
-	"github.com/uQUIC/XGFW/ruleset/builtins/geo"
+	"github.com/v2TLS/XGFW/operation/protocol"
+	"github.com/v2TLS/XGFW/modifier"
+	"github.com/v2TLS/XGFW/ruleset/builtins/geo"
 )
 
 type Action int

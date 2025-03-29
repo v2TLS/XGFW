@@ -17,10 +17,10 @@ import (
 	"github.com/expr-lang/expr/vm"
 	"gopkg.in/yaml.v3"
 
-	"github.com/uQUIC/XGFW/operation/protocol"
-	"github.com/uQUIC/XGFW/operation/protocol/tcp"
-	"github.com/uQUIC/XGFW/modifier"
-	"github.com/uQUIC/XGFW/ruleset/builtins"
+	"github.com/v2TLS/XGFW/operation/protocol"
+	"github.com/v2TLS/XGFW/operation/protocol/tcp"
+	"github.com/v2TLS/XGFW/modifier"
+	"github.com/v2TLS/XGFW/ruleset/builtins"
 )
 
 // ExprRule is the external representation of an expression rule.

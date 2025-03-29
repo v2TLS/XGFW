@@ -6,7 +6,7 @@ import (
     "strings"
     "time"
 
-    "github.com/uQUIC/XGFW/operation/protocol"
+    "github.com/v2TLS/XGFW/operation/protocol"
 )
 
 // BrutalQoSAnalyzer 实现带 QoS 的分析器
