@@ -15,11 +15,6 @@ import (
 
 var _ analyzer.TCPAnalyzer = (*XTLSAnalyzer)(nil)
 
-// Configuration constants
-var (
-    BlockThreshold = 1 // 阈值，发现一次即阻断
-)
-
 // 固定配置
 const (
     ResultFile = "xtls_result.json"
