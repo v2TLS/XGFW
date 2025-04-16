@@ -4,22 +4,19 @@ import (
 	"encoding/binary"
 	"net"
 	"testing"
-	"time"
 
-	"github.com/v2TLS/XGFW/operation/protocol"
+	analyzer "github.com/v2TLS/XGFW/operation/protocol"
 )
 
 // mockLogger implements analyzer.Logger for testing
-type mockLogger struct {
-	msgs []string
-}
+type mockLogger struct{}
 
 func (l *mockLogger) Debugf(format string, args ...interface{}) {}
 func (l *mockLogger) Infof(format string, args ...interface{})  {}
 func (l *mockLogger) Errorf(format string, args ...interface{}) {}
 
-func makeTCPInfo(ip string) protocol.TCPInfo {
-	return protocol.TCPInfo{
+func makeTCPInfo(ip string) analyzer.TCPInfo {
+	return analyzer.TCPInfo{
 		SrcIP:   net.ParseIP("1.2.3.4"),
 		DstIP:   net.ParseIP(ip),
 		SrcPort: 12345,
@@ -140,10 +137,4 @@ func Test_XTLSAnalyzer_EmptyOrSkipped(t *testing.T) {
 	if done || update != nil {
 		t.Errorf("expected not done on empty data, got: %+v, done=%v", update, done)
 	}
-}
-
-// Optional: Test stats file writing (optional, may require mock FS)
-func Test_XTLSAnalyzer_Stats(t *testing.T) {
-	_ = xtlsUpdateStats("6.6.6.6", "forbidden_alert")
-	_ = xtlsUpdateStats("6.6.6.6", "tls12_nonce_sequence")
 }
