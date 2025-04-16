@@ -122,7 +122,6 @@ func Test_XTLSAnalyzer_RepeatedFeed(t *testing.T) {
 	}
 }
 
-// Optional: Test empty or skipped data
 func Test_XTLSAnalyzer_EmptyOrSkipped(t *testing.T) {
 	a := &XTLSAnalyzer{}
 	logger := &mockLogger{}
@@ -134,7 +133,7 @@ func Test_XTLSAnalyzer_EmptyOrSkipped(t *testing.T) {
 		t.Errorf("expected done on skip, got: %+v, done=%v", update, done)
 	}
 	update, done = stream.Feed(false, false, false, 0, nil)
-	if done || update != nil {
-		t.Errorf("expected not done on empty data, got: %+v, done=%v", update, done)
+	if !done || update != nil {
+		t.Errorf("expected done on empty data, got: %+v, done=%v", update, done)
 	}
 }
