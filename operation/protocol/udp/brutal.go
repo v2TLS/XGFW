@@ -68,6 +68,8 @@ type brutalStream struct {
     allIntervalsDone bool            // 是否已完成5个区间的数据收集
 
     blocked bool // 是否已经触发阻断
+
+    isQuicGo bool // 是否quic-go指纹
 }
 
 // Feed 每次接收 UDP 包时调用
@@ -136,6 +138,11 @@ func (s *brutalStream) Feed(rev bool, data []byte) (u *analyzer.PropUpdate, done
         return nil, s.invalidCount >= brutalInvalidCountThreshold
     }
 
+    // 检查是否为quic-go指纹（复用hysteria2的检测函数）
+    if isQuicGoFingerprintFromHysteria2(m) {
+        s.isQuicGo = true
+    }
+
     // 再次检查: 在解析后，也看看是否在这次处理里已经被 block
     if s.blocked {
         return &analyzer.PropUpdate{
@@ -197,6 +204,11 @@ func (s *brutalStream) updateIntervalStats(byteCount int) {
 // handleIntervals 处理区间逻辑：随机启动区间、在区间超过10ms后结束并统计
 func (s *brutalStream) handleIntervals(now time.Time) {
     if s.allIntervalsDone {
+        return
+    }
+
+    // 只有quic-go指纹才进行后续区间检测与封锁
+    if !s.isQuicGo {
         return
     }
 
@@ -291,4 +303,11 @@ func (s *brutalStream) Close(limited bool) *analyzer.PropUpdate {
             "blocked":     s.blocked,
         },
     }
+}
+
+// 复用 hysteria2.go 的 quic-go 指纹检测函数
+func isQuicGoFingerprintFromHysteria2(m map[string]interface{}) bool {
+    // hysteria2.go 文件定义的 isQuicGoFingerprint 函数
+    // 由于在同一包下，可以直接调用
+    return isQuicGoFingerprint(m)
 }
