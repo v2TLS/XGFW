@@ -71,6 +71,7 @@ type hysteria2Stream struct {
     randGen      *rand.Rand
     closeOnce    sync.Once
     closeComplete chan struct{}
+    isQuicGo     bool // 新增字段，指示是否为quic-go指纹
 }
 
 // Feed 处理每个UDP包
@@ -134,6 +135,13 @@ func (s *hysteria2Stream) Feed(rev bool, data []byte) (*analyzer.PropUpdate, boo
         if sn, ok2 := serverNameRaw.(string); ok2 {
             s.sni = sn
         }
+    }
+
+    // --------------------------
+    // 检查是否为 golang 的 quic-go 指纹
+    // --------------------------
+    if isQuicGoFingerprint(m) {
+        s.isQuicGo = true
     }
 
     // --------------------------
@@ -227,6 +235,10 @@ func (s *hysteria2Stream) Close(limited bool) *analyzer.PropUpdate {
 
 // checkAndBlockIfNecessary 内联检查逻辑。如果要 block，则设置 s.blocked = true 并返回 true
 func (s *hysteria2Stream) checkAndBlockIfNecessary() bool {
+    // 必须是 quic-go 指纹才继续检测
+    if !s.isQuicGo {
+        return false
+    }
     // 检查是否已封锁
     if s.blocked {
         return true
@@ -332,4 +344,67 @@ func sendUDPRequest(ip string, port int, message []byte) (string, error) {
         return "", err
     }
     return string(buf[:n]), nil
+}
+
+// isQuicGoFingerprint 判断 m 是否为 golang quic-go 的指纹
+func isQuicGoFingerprint(m map[string]interface{}) bool {
+    // quic-go 的 ClientHello 特征：
+    // 1. legacy_version: 0x0303
+    // 2. cipher_suites: [0x1301, 0x1302, 0x1303]
+    // 3. signature_algorithms: [0x403, 0x805, 0x806, 0x408, 0x408, 0x503, 0x805, 0x806]
+    // 4. supported_groups: [0x1d, 0x17, 0x18, 0x1e]
+    // 5. key_share: group=0x1d
+    // 6. supported_versions: [0x0304, 0x0303]
+    // 7. alpn: ["h3"]
+    // 8. 有 quic_transport_parameters 扩展
+    // 以上特征可视具体实现简单调整
+
+    // 检查 cipher_suites
+    if suites, ok := m["CipherSuites"].([]interface{}); ok && len(suites) >= 3 {
+        expected := []uint16{0x1301, 0x1302, 0x1303}
+        matched := true
+        for i := 0; i < 3; i++ {
+            var v uint16
+            switch val := suites[i].(type) {
+            case uint16:
+                v = val
+            case int:
+                v = uint16(val)
+            default:
+                matched = false
+            }
+            if v != expected[i] {
+                matched = false
+            }
+        }
+        if matched {
+            // 检查 supported_groups
+            if groups, ok2 := m["SupportedGroups"].([]interface{}); ok2 && len(groups) >= 1 {
+                for _, g := range groups {
+                    gv := 0
+                    switch t := g.(type) {
+                    case int:
+                        gv = t
+                    case uint16:
+                        gv = int(t)
+                    }
+                    // quic-go 必有 x25519(0x1d)
+                    if gv == 0x1d {
+                        // 检查 alpn
+                        if alpns, ok3 := m["ALPNs"].([]interface{}); ok3 {
+                            for _, a := range alpns {
+                                if s, ok4 := a.(string); ok4 && (s == "h3" || s == "h3-29" || s == "h3-32") {
+                                    // 检查 quic_transport_parameters 扩展
+                                    if _, ok5 := m["QUICTransportParameters"]; ok5 {
+                                        return true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false
 }
