@@ -1,6 +1,6 @@
 # XGFW
 
-[![Quality check status](https://github.com/uQUIC/XGFW/actions/workflows/check.yaml/badge.svg)](https://github.com/uQUIC/XGFW/actions/workflows/check.yaml)
+[![Quality check status](https://github.com/v2TLS/XGFW/actions/workflows/check.yaml/badge.svg)](https://github.com/v2TLS/XGFW/actions/workflows/check.yaml)
 
 [1]: https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg
 [2]: LICENSE
