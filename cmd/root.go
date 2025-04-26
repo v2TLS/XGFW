@@ -113,6 +113,7 @@ var analyzers = []analyzer.Analyzer{
 	&udp.WireGuardAnalyzer{},
 	&filtertcp.GolangTLSSelfSignedAnalyzer{},
 	&filtertcp.MailAuthPlainAnalyzer{},
+	&filtertcp.TLSCertExpiryAnalyzer{},
 }
 
 var modifiers = []modifier.Modifier{
