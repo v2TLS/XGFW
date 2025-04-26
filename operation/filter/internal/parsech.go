@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"bytes"
 	"encoding/binary"
 	"strings"
 )
