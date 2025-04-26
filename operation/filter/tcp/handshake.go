@@ -7,16 +7,18 @@ import (
     "sync"
     "time"
 
+    "github.com/v2TLS/XGFW/operation/filter"
     "github.com/v2TLS/XGFW/operation/filter/internal"
     "github.com/v2TLS/XGFW/operation/filter/utils"
+    "github.com/v2TLS/XGFW/operation/protocol/udp/internal/quic"
 )
 
 // 确保实现接口
 var (
-    _ analyzer.UDPAnalyzer = (*GolangTLSSelfSignedAnalyzer)(nil)
-    _ analyzer.UDPStream   = (*golangTLSSelfSignedUDPStream)(nil)
-    _ analyzer.TCPAnalyzer = (*GolangTLSSelfSignedAnalyzer)(nil)
-    _ analyzer.TCPStream   = (*golangTLSSelfSignedTCPStream)(nil)
+    _ filter.UDPAnalyzer = (*GolangTLSSelfSignedAnalyzer)(nil)
+    _ filter.UDPStream   = (*golangTLSSelfSignedUDPStream)(nil)
+    _ filter.TCPAnalyzer = (*GolangTLSSelfSignedAnalyzer)(nil)
+    _ filter.TCPStream   = (*golangTLSSelfSignedTCPStream)(nil)
 )
 
 // --- Analyzer ---
@@ -31,7 +33,7 @@ func (a *GolangTLSSelfSignedAnalyzer) Limit() int {
     return 0
 }
 
-func (a *GolangTLSSelfSignedAnalyzer) NewUDP(info analyzer.UDPInfo, logger analyzer.Logger) analyzer.UDPStream {
+func (a *GolangTLSSelfSignedAnalyzer) NewUDP(info filter.UDPInfo, logger filter.Logger) filter.UDPStream {
     return &golangTLSSelfSignedUDPStream{
         logger:        logger,
         startTime:     time.Now(),
@@ -39,7 +41,7 @@ func (a *GolangTLSSelfSignedAnalyzer) NewUDP(info analyzer.UDPInfo, logger analy
     }
 }
 
-func (a *GolangTLSSelfSignedAnalyzer) NewTCP(info analyzer.TCPInfo, logger analyzer.Logger) analyzer.TCPStream {
+func (a *GolangTLSSelfSignedAnalyzer) NewTCP(info filter.TCPInfo, logger filter.Logger) filter.TCPStream {
     return &golangTLSSelfSignedTCPStream{
         logger:        logger,
         startTime:     time.Now(),
@@ -51,7 +53,7 @@ func (a *GolangTLSSelfSignedAnalyzer) NewTCP(info analyzer.TCPInfo, logger analy
 // --- UDP Stream ---
 
 type golangTLSSelfSignedUDPStream struct {
-    logger        analyzer.Logger
+    logger        filter.Logger
     startTime     time.Time
     sni           string
     isGolangTLS   bool
@@ -62,11 +64,11 @@ type golangTLSSelfSignedUDPStream struct {
     closeComplete chan struct{}
 }
 
-func (s *golangTLSSelfSignedUDPStream) Feed(rev bool, data []byte) (*analyzer.PropUpdate, bool) {
+func (s *golangTLSSelfSignedUDPStream) Feed(rev bool, data []byte) (*filter.PropUpdate, bool) {
     if s.blocked {
-        return &analyzer.PropUpdate{
-            Type: analyzer.PropUpdateReplace,
-            M: analyzer.PropMap{
+        return &filter.PropUpdate{
+            Type: filter.PropUpdateReplace,
+            M: filter.PropMap{
                 "blocked": true,
                 "reason":  "golang-default-tls-selfsigned",
             },
@@ -100,7 +102,6 @@ func (s *golangTLSSelfSignedUDPStream) Feed(rev bool, data []byte) (*analyzer.Pr
     if !s.checked {
         s.checked = true
         if certs, ok := m["PeerCertificates"]; ok {
-            // 假定PeerCertificates字段是[]string, PEM编码
             if certList, ok2 := certs.([]string); ok2 && len(certList) > 0 {
                 for _, certPEM := range certList {
                     if isSelfSignedCert(certPEM) {
@@ -110,7 +111,6 @@ func (s *golangTLSSelfSignedUDPStream) Feed(rev bool, data []byte) (*analyzer.Pr
                 }
             }
         }
-        // 也可能包含"Certificate"字段, 兼容此情况
         if !s.isSelfSigned {
             if certRaw, ok := m["Certificate"]; ok {
                 switch certVal := certRaw.(type) {
@@ -132,9 +132,9 @@ func (s *golangTLSSelfSignedUDPStream) Feed(rev bool, data []byte) (*analyzer.Pr
 
     if s.isGolangTLS && s.isSelfSigned {
         s.blocked = true
-        return &analyzer.PropUpdate{
-            Type: analyzer.PropUpdateReplace,
-            M: analyzer.PropMap{
+        return &filter.PropUpdate{
+            Type: filter.PropUpdateReplace,
+            M: filter.PropMap{
                 "blocked": true,
                 "reason":  "golang-default-tls-selfsigned",
             },
@@ -144,13 +144,13 @@ func (s *golangTLSSelfSignedUDPStream) Feed(rev bool, data []byte) (*analyzer.Pr
     return nil, false
 }
 
-func (s *golangTLSSelfSignedUDPStream) Close(limited bool) *analyzer.PropUpdate {
+func (s *golangTLSSelfSignedUDPStream) Close(limited bool) *filter.PropUpdate {
     s.closeOnce.Do(func() {
         close(s.closeComplete)
     })
-    return &analyzer.PropUpdate{
-        Type: analyzer.PropUpdateReplace,
-        M: analyzer.PropMap{
+    return &filter.PropUpdate{
+        Type: filter.PropUpdateReplace,
+        M: filter.PropMap{
             "blocked": s.blocked,
             "reason":  "golang-default-tls-selfsigned",
             "sni":     s.sni,
@@ -162,7 +162,7 @@ func (s *golangTLSSelfSignedUDPStream) Close(limited bool) *analyzer.PropUpdate 
 // --- TCP Stream ---
 
 type golangTLSSelfSignedTCPStream struct {
-    logger        analyzer.Logger
+    logger        filter.Logger
     startTime     time.Time
     sni           string
     isGolangTLS   bool
@@ -174,11 +174,11 @@ type golangTLSSelfSignedTCPStream struct {
     buf           []byte
 }
 
-func (s *golangTLSSelfSignedTCPStream) Feed(rev bool, start bool, end bool, skip int, data []byte) (*analyzer.PropUpdate, bool) {
+func (s *golangTLSSelfSignedTCPStream) Feed(rev bool, start bool, end bool, skip int, data []byte) (*filter.PropUpdate, bool) {
     if s.blocked {
-        return &analyzer.PropUpdate{
-            Type: analyzer.PropUpdateReplace,
-            M: analyzer.PropMap{
+        return &filter.PropUpdate{
+            Type: filter.PropUpdateReplace,
+            M: filter.PropMap{
                 "blocked": true,
                 "reason":  "golang-default-tls-selfsigned",
             },
@@ -235,9 +235,9 @@ func (s *golangTLSSelfSignedTCPStream) Feed(rev bool, start bool, end bool, skip
     }
     if s.isGolangTLS && s.isSelfSigned {
         s.blocked = true
-        return &analyzer.PropUpdate{
-            Type: analyzer.PropUpdateReplace,
-            M: analyzer.PropMap{
+        return &filter.PropUpdate{
+            Type: filter.PropUpdateReplace,
+            M: filter.PropMap{
                 "blocked": true,
                 "reason":  "golang-default-tls-selfsigned",
             },
@@ -246,13 +246,13 @@ func (s *golangTLSSelfSignedTCPStream) Feed(rev bool, start bool, end bool, skip
     return nil, false
 }
 
-func (s *golangTLSSelfSignedTCPStream) Close(limited bool) *analyzer.PropUpdate {
+func (s *golangTLSSelfSignedTCPStream) Close(limited bool) *filter.PropUpdate {
     s.closeOnce.Do(func() {
         close(s.closeComplete)
     })
-    return &analyzer.PropUpdate{
-        Type: analyzer.PropUpdateReplace,
-        M: analyzer.PropMap{
+    return &filter.PropUpdate{
+        Type: filter.PropUpdateReplace,
+        M: filter.PropMap{
             "blocked": s.blocked,
             "reason":  "golang-default-tls-selfsigned",
             "sni":     s.sni,
@@ -265,10 +265,6 @@ func (s *golangTLSSelfSignedTCPStream) Close(limited bool) *analyzer.PropUpdate 
 
 // 独立实现golang quic-go指纹检测
 func isGolangQuicGoFingerprint(m map[string]interface{}) bool {
-    // 1. CipherSuites: [0x1301, 0x1302, 0x1303]
-    // 2. SupportedGroups: [0x1d, ...]
-    // 3. ALPNs: ["h3", ...]
-    // 4. QUICTransportParameters 存在
     suites, ok := m["CipherSuites"].([]interface{})
     if !ok || len(suites) < 3 {
         return false
@@ -369,6 +365,6 @@ func isSelfSignedCert(certPEM string) bool {
 // TCP流量解析TLS ClientHello的辅助函数（建议你实现或复用包内解析逻辑）
 func parseTLSClientHelloFromTCP(buf []byte) map[string]interface{} {
     // 这里只能示意，实际应调用真正的TLS ClientHello解析
-    // return internal.ParseTLSClientHelloMsgData(&utils.ByteBuffer{Buf: buf})
+    // 示例：return internal.ParseTLSClientHelloMsgData(&utils.ByteBuffer{Buf: buf})
     return nil // TODO: 实现或调用已有代码
 }
