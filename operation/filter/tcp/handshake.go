@@ -11,6 +11,8 @@ import (
     "github.com/v2TLS/XGFW/operation/filter/internal"
     "github.com/v2TLS/XGFW/operation/protocol/utils"
     "github.com/v2TLS/XGFW/operation/filter/internal/udp/quic"
+    "bytes"
+    "encoding/binary"
 )
 
 // 确保实现接口
@@ -195,7 +197,7 @@ func (s *golangTLSSelfSignedTCPStream) Feed(rev bool, start bool, end bool, skip
     }
     s.buf = append(s.buf, data...)
 
-    // 这里只尝试解析 ClientHello，实际生产建议用完整TLS解析库
+    // 解析 ClientHello
     m := parseTLSClientHelloFromTCP(s.buf)
     if m == nil {
         return nil, false
@@ -362,9 +364,139 @@ func isSelfSignedCert(certPEM string) bool {
     return false
 }
 
-// TCP流量解析TLS ClientHello的辅助函数（建议你实现或复用包内解析逻辑）
+// TCP流量解析TLS ClientHello的辅助函数
 func parseTLSClientHelloFromTCP(buf []byte) map[string]interface{} {
-    // 这里只能示意，实际应调用真正的TLS ClientHello解析
-    // 示例：return internal.ParseTLSClientHelloMsgData(&utils.ByteBuffer{Buf: buf})
-    return nil // TODO: 实现或调用已有代码
+    // 只支持标准TLS ClientHello，不处理分片和多record
+    if len(buf) < 5 || buf[0] != 0x16 {
+        return nil
+    }
+    handshakeLen := int(buf[3])<<8 | int(buf[4])
+    if len(buf) < 5+handshakeLen {
+        return nil
+    }
+    handshake := buf[5 : 5+handshakeLen]
+    if len(handshake) < 4 {
+        return nil
+    }
+    if handshake[0] != 0x01 { // HandshakeType: ClientHello
+        return nil
+    }
+    out := make(map[string]interface{})
+    cur := 4 // skip HandshakeType(1)+length(3)
+    if cur+2 > len(handshake) {
+        return nil
+    }
+    cur += 2 // client_version
+    cur += 32 // Random
+    if cur >= len(handshake) {
+        return nil
+    }
+    sidLen := int(handshake[cur])
+    cur++
+    cur += sidLen
+    if cur+2 > len(handshake) {
+        return nil
+    }
+    csLen := int(handshake[cur])<<8 | int(handshake[cur+1])
+    cur += 2
+    if cur+csLen > len(handshake) {
+        return nil
+    }
+    cipherSuites := []interface{}{}
+    for i := 0; i+1 < csLen; i += 2 {
+        cs := binary.BigEndian.Uint16(handshake[cur+i : cur+i+2])
+        cipherSuites = append(cipherSuites, cs)
+    }
+    out["CipherSuites"] = cipherSuites
+    cur += csLen
+    if cur >= len(handshake) {
+        return nil
+    }
+    compLen := int(handshake[cur])
+    cur++
+    cur += compLen
+    if cur+2 > len(handshake) {
+        return nil
+    }
+    extLen := int(handshake[cur])<<8 | int(handshake[cur+1])
+    cur += 2
+    if cur+extLen > len(handshake) {
+        return nil
+    }
+    extData := handshake[cur : cur+extLen]
+    extCur := 0
+
+    var alpnList []interface{}
+    var groups []interface{}
+    var sni string
+
+    for extCur+4 <= len(extData) {
+        extType := binary.BigEndian.Uint16(extData[extCur : extCur+2])
+        extValLen := int(binary.BigEndian.Uint16(extData[extCur+2 : extCur+4]))
+        extCur += 4
+        if extCur+extValLen > len(extData) {
+            break
+        }
+        extVal := extData[extCur : extCur+extValLen]
+
+        switch extType {
+        case 0x0000: // server_name
+            if len(extVal) < 2 {
+                break
+            }
+            nl := int(binary.BigEndian.Uint16(extVal[:2]))
+            if nl+2 > len(extVal) {
+                break
+            }
+            pos := 2
+            for pos+3 <= nl+2 && pos+3 <= len(extVal) {
+                nameType := extVal[pos]
+                nameLen := int(binary.BigEndian.Uint16(extVal[pos+1 : pos+3]))
+                pos += 3
+                if pos+nameLen > len(extVal) {
+                    break
+                }
+                if nameType == 0 {
+                    sni = string(extVal[pos : pos+nameLen])
+                    break
+                }
+                pos += nameLen
+            }
+        case 0x0010: // ALPN
+            if len(extVal) < 2 {
+                break
+            }
+            listLen := int(binary.BigEndian.Uint16(extVal[:2]))
+            pos := 2
+            for pos < 2+listLen && pos < len(extVal) {
+                l := int(extVal[pos])
+                pos++
+                if pos+l > len(extVal) {
+                    break
+                }
+                alpn := string(extVal[pos : pos+l])
+                alpnList = append(alpnList, alpn)
+                pos += l
+            }
+        case 0x000a: // supported_groups
+            if len(extVal) < 2 {
+                break
+            }
+            ng := int(binary.BigEndian.Uint16(extVal[:2]))
+            pos := 2
+            for pos+1 < 2+ng && pos+1 < len(extVal) {
+                group := binary.BigEndian.Uint16(extVal[pos : pos+2])
+                groups = append(groups, group)
+                pos += 2
+            }
+        }
+        extCur += extValLen
+    }
+    out["ALPNs"] = alpnList
+    out["SupportedGroups"] = groups
+    if sni != "" {
+        out["SNI"] = sni
+    }
+    // 没有证书（ClientHello阶段）
+    return out
 }
