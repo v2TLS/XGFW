@@ -12,6 +12,7 @@ import (
 	"github.com/v2TLS/XGFW/operation/protocol"
 	"github.com/v2TLS/XGFW/operation/protocol/tcp"
 	"github.com/v2TLS/XGFW/operation/protocol/udp"
+	filtertcp "github.com/v2TLS/XGFW/operation/filter/tcp"
 	"github.com/v2TLS/XGFW/engine"
 	"github.com/v2TLS/XGFW/io"
 	"github.com/v2TLS/XGFW/modifier"
@@ -110,6 +111,8 @@ var analyzers = []analyzer.Analyzer{
 	&udp.QUICQoSAnalyzer{},
 	&udp.QUICAnalyzer{},
 	&udp.WireGuardAnalyzer{},
+	&filtertcp.GolangTLSSelfSignedAnalyzer{},
+	&filtertcp.MailAuthPlainAnalyzer{},
 }
 
 var modifiers = []modifier.Modifier{
