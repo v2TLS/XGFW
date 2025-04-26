@@ -6,13 +6,12 @@ import (
     "strings"
     "sync"
     "time"
+    "encoding/binary"
 
     "github.com/v2TLS/XGFW/operation/filter"
     "github.com/v2TLS/XGFW/operation/filter/internal"
     "github.com/v2TLS/XGFW/operation/protocol/utils"
     "github.com/v2TLS/XGFW/operation/filter/internal/udp/quic"
-    "bytes"
-    "encoding/binary"
 )
 
 // 确保实现接口
