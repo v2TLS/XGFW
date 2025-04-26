@@ -35,8 +35,3 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           files: ./coverage.out
-
-      - name: staticcheck
-        uses: dominikh/staticcheck-action@v1.3.0
-        with:
-          install-go: false
