@@ -9,7 +9,7 @@ import (
     "sync"
     "time"
 
-    "github.com/v2TLS/XGFW/operation/protocol"
+    "github.com/v2TLS/XGFW/operation"
 )
 
 var _ analyzer.UDPAnalyzer = (*SkypeAnalyzer)(nil)

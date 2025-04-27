@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/v2TLS/XGFW/operation/protocol"
+	"github.com/v2TLS/XGFW/operation"
 )
 
 func TestQuicStreamParsing_ClientHello(t *testing.T) {
