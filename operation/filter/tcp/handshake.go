@@ -8,7 +8,7 @@ import (
     "time"
     "encoding/binary"
 
-    analyser "github.com/v2TLS/XGFW/operation"
+    filter "github.com/v2TLS/XGFW/operation"
     "github.com/v2TLS/XGFW/operation/filter/internal"
     "github.com/v2TLS/XGFW/operation/protocol/utils"
     "github.com/v2TLS/XGFW/operation/filter/internal/udp/quic"
@@ -16,10 +16,10 @@ import (
 
 // 确保实现接口
 var (
-    _ analyser.UDPAnalyzer = (*GolangTLSSelfSignedAnalyzer)(nil)
-    _ analyser.UDPStream   = (*golangTLSSelfSignedUDPStream)(nil)
-    _ analyser.TCPAnalyzer = (*GolangTLSSelfSignedAnalyzer)(nil)
-    _ analyser.TCPStream   = (*golangTLSSelfSignedTCPStream)(nil)
+    _ filter.UDPAnalyzer = (*GolangTLSSelfSignedAnalyzer)(nil)
+    _ filter.UDPStream   = (*golangTLSSelfSignedUDPStream)(nil)
+    _ filter.TCPAnalyzer = (*GolangTLSSelfSignedAnalyzer)(nil)
+    _ filter.TCPStream   = (*golangTLSSelfSignedTCPStream)(nil)
 )
 
 // --- Analyzer ---
@@ -34,7 +34,7 @@ func (a *GolangTLSSelfSignedAnalyzer) Limit() int {
     return 0
 }
 
-func (a *GolangTLSSelfSignedAnalyzer) NewUDP(info analyser.UDPInfo, logger analyser.Logger) analyser.UDPStream {
+func (a *GolangTLSSelfSignedAnalyzer) NewUDP(info filter.UDPInfo, logger filter.Logger) filter.UDPStream {
     return &golangTLSSelfSignedUDPStream{
         logger:        logger,
         startTime:     time.Now(),
@@ -42,7 +42,7 @@ func (a *GolangTLSSelfSignedAnalyzer) NewUDP(info analyser.UDPInfo, logger analy
     }
 }
 
-func (a *GolangTLSSelfSignedAnalyzer) NewTCP(info analyser.TCPInfo, logger analyser.Logger) analyser.TCPStream {
+func (a *GolangTLSSelfSignedAnalyzer) NewTCP(info filter.TCPInfo, logger filter.Logger) filter.TCPStream {
     return &golangTLSSelfSignedTCPStream{
         logger:        logger,
         startTime:     time.Now(),
@@ -54,7 +54,7 @@ func (a *GolangTLSSelfSignedAnalyzer) NewTCP(info analyser.TCPInfo, logger analy
 // --- UDP Stream ---
 
 type golangTLSSelfSignedUDPStream struct {
-    logger        analyser.Logger
+    logger        filter.Logger
     startTime     time.Time
     sni           string
     isGolangTLS   bool
@@ -65,11 +65,11 @@ type golangTLSSelfSignedUDPStream struct {
     closeComplete chan struct{}
 }
 
-func (s *golangTLSSelfSignedUDPStream) Feed(rev bool, data []byte) (*analyser.PropUpdate, bool) {
+func (s *golangTLSSelfSignedUDPStream) Feed(rev bool, data []byte) (*filter.PropUpdate, bool) {
     if s.blocked {
-        return &analyser.PropUpdate{
-            Type: analyser.PropUpdateReplace,
-            M: analyser.PropMap{
+        return &filter.PropUpdate{
+            Type: filter.PropUpdateReplace,
+            M: filter.PropMap{
                 "blocked": true,
                 "reason":  "golang-default-tls-selfsigned",
             },
@@ -133,9 +133,9 @@ func (s *golangTLSSelfSignedUDPStream) Feed(rev bool, data []byte) (*analyser.Pr
 
     if s.isGolangTLS && s.isSelfSigned {
         s.blocked = true
-        return &analyser.PropUpdate{
-            Type: analyser.PropUpdateReplace,
-            M: analyser.PropMap{
+        return &filter.PropUpdate{
+            Type: filter.PropUpdateReplace,
+            M: filter.PropMap{
                 "blocked": true,
                 "reason":  "golang-default-tls-selfsigned",
             },
@@ -145,13 +145,13 @@ func (s *golangTLSSelfSignedUDPStream) Feed(rev bool, data []byte) (*analyser.Pr
     return nil, false
 }
 
-func (s *golangTLSSelfSignedUDPStream) Close(limited bool) *analyser.PropUpdate {
+func (s *golangTLSSelfSignedUDPStream) Close(limited bool) *filter.PropUpdate {
     s.closeOnce.Do(func() {
         close(s.closeComplete)
     })
-    return &analyser.PropUpdate{
-        Type: analyser.PropUpdateReplace,
-        M: analyser.PropMap{
+    return &filter.PropUpdate{
+        Type: filter.PropUpdateReplace,
+        M: filter.PropMap{
             "blocked": s.blocked,
             "reason":  "golang-default-tls-selfsigned",
             "sni":     s.sni,
@@ -163,7 +163,7 @@ func (s *golangTLSSelfSignedUDPStream) Close(limited bool) *analyser.PropUpdate 
 // --- TCP Stream ---
 
 type golangTLSSelfSignedTCPStream struct {
-    logger        analyser.Logger
+    logger        filter.Logger
     startTime     time.Time
     sni           string
     isGolangTLS   bool
@@ -175,11 +175,11 @@ type golangTLSSelfSignedTCPStream struct {
     buf           []byte
 }
 
-func (s *golangTLSSelfSignedTCPStream) Feed(rev bool, start bool, end bool, skip int, data []byte) (*analyser.PropUpdate, bool) {
+func (s *golangTLSSelfSignedTCPStream) Feed(rev bool, start bool, end bool, skip int, data []byte) (*filter.PropUpdate, bool) {
     if s.blocked {
-        return &analyser.PropUpdate{
-            Type: analyser.PropUpdateReplace,
-            M: analyser.PropMap{
+        return &filter.PropUpdate{
+            Type: filter.PropUpdateReplace,
+            M: filter.PropMap{
                 "blocked": true,
                 "reason":  "golang-default-tls-selfsigned",
             },
@@ -236,9 +236,9 @@ func (s *golangTLSSelfSignedTCPStream) Feed(rev bool, start bool, end bool, skip
     }
     if s.isGolangTLS && s.isSelfSigned {
         s.blocked = true
-        return &analyser.PropUpdate{
-            Type: analyser.PropUpdateReplace,
-            M: analyser.PropMap{
+        return &filter.PropUpdate{
+            Type: filter.PropUpdateReplace,
+            M: filter.PropMap{
                 "blocked": true,
                 "reason":  "golang-default-tls-selfsigned",
             },
@@ -247,13 +247,13 @@ func (s *golangTLSSelfSignedTCPStream) Feed(rev bool, start bool, end bool, skip
     return nil, false
 }
 
-func (s *golangTLSSelfSignedTCPStream) Close(limited bool) *analyser.PropUpdate {
+func (s *golangTLSSelfSignedTCPStream) Close(limited bool) *filter.PropUpdate {
     s.closeOnce.Do(func() {
         close(s.closeComplete)
     })
-    return &analyser.PropUpdate{
-        Type: analyser.PropUpdateReplace,
-        M: analyser.PropMap{
+    return &filter.PropUpdate{
+        Type: filter.PropUpdateReplace,
+        M: filter.PropMap{
             "blocked": s.blocked,
             "reason":  "golang-default-tls-selfsigned",
             "sni":     s.sni,
