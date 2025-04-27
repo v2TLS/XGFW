@@ -1,6 +1,6 @@
 package tcp
 
-import "github.com/v2TLS/XGFW/operation/protocol"
+import "github.com/v2TLS/XGFW/operation"
 
 var _ analyzer.TCPAnalyzer = (*FETAnalyzer)(nil)
 

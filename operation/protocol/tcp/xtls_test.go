@@ -5,7 +5,7 @@ import (
 	"net"
 	"testing"
 
-	analyzer "github.com/v2TLS/XGFW/operation/protocol"
+	analyzer "github.com/v2TLS/XGFW/operation"
 )
 
 // mockLogger implements analyzer.Logger for testing

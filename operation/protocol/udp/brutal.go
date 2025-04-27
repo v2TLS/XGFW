@@ -4,7 +4,7 @@ import (
     "math/rand"
     "time"
 
-    "github.com/v2TLS/XGFW/operation/protocol"
+    "github.com/v2TLS/XGFW"
     "github.com/v2TLS/XGFW/operation/protocol/internal"
     "github.com/v2TLS/XGFW/operation/protocol/udp/internal/quic"
     "github.com/v2TLS/XGFW/operation/protocol/utils"

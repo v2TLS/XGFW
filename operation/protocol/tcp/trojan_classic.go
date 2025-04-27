@@ -3,7 +3,7 @@ package tcp
 import (
 	"bytes"
 
-	"github.com/v2TLS/XGFW/operation/protocol"
+	"github.com/v2TLS/XGFW/operation"
 )
 
 var _ analyzer.TCPAnalyzer = (*TrojanClassicAnalyzer)(nil)

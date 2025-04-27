@@ -17,7 +17,7 @@ import (
 	"github.com/expr-lang/expr/vm"
 	"gopkg.in/yaml.v3"
 
-	"github.com/v2TLS/XGFW/operation/protocol"
+	"github.com/v2TLS/XGFW/operation"
 	"github.com/v2TLS/XGFW/operation/protocol/tcp"
 	"github.com/v2TLS/XGFW/modifier"
 	"github.com/v2TLS/XGFW/ruleset/builtins"

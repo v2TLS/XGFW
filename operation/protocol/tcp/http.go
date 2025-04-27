@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/v2TLS/XGFW/operation/protocol"
+	"github.com/v2TLS/XGFW/operation"
 	"github.com/v2TLS/XGFW/operation/protocol/utils"
 )
 
