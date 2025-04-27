@@ -8,7 +8,7 @@ import (
     "time"
     "encoding/binary"
 
-    "github.com/v2TLS/XGFW/operation"
+    analyser "github.com/v2TLS/XGFW/operation"
     "github.com/v2TLS/XGFW/operation/filter/internal"
     "github.com/v2TLS/XGFW/operation/protocol/utils"
     "github.com/v2TLS/XGFW/operation/filter/internal/udp/quic"
