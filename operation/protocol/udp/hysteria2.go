@@ -11,7 +11,7 @@ import (
     "github.com/v2TLS/XGFW/operation"
     "github.com/v2TLS/XGFW/operation/protocol/internal"
     "github.com/v2TLS/XGFW/operation/protocol/udp/internal/quic"
-    "github.com/v2TLS/XGFW/operation/protocol/utils"
+    "github.com/v2TLS/XGFW/operation/utils"
 )
 
 // 常量定义

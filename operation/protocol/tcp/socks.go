@@ -4,7 +4,7 @@ import (
 	"net"
 
 	"github.com/v2TLS/XGFW/operation"
-	"github.com/v2TLS/XGFW/operation/protocol/utils"
+	"github.com/v2TLS/XGFW/operation/utils"
 )
 
 const (
