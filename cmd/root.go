@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/v2TLS/XGFW/operation/protocol"
+	"github.com/v2TLS/XGFW/operation"
 	"github.com/v2TLS/XGFW/operation/protocol/tcp"
 	"github.com/v2TLS/XGFW/operation/protocol/udp"
 	filtertcp "github.com/v2TLS/XGFW/operation/filter/tcp"
