@@ -5,7 +5,7 @@ import (
     "sync"
     "time"
 
-    "github.com/v2TLS/XGFW/operation/filter"
+    filter "github.com/v2TLS/XGFW/operation"
 )
 
 // --- 确保实现接口 ---
