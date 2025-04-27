@@ -1,7 +1,7 @@
 package udp
 
 import (
-	"github.com/v2TLS/XGFW/operation/protocol"
+	"github.com/v2TLS/XGFW/operation"
 	"github.com/v2TLS/XGFW/operation/protocol/utils"
 
 	"github.com/google/gopacket"
