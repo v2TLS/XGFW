@@ -2,7 +2,7 @@ package udp
 
 import (
     "encoding/binary"
-    "github.com/v2TLS/XGFW/operation/protocol"
+    "github.com/v2TLS/XGFW/operation"
     "bytes"
 )
 
