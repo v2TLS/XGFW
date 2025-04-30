@@ -4,8 +4,6 @@
 
 [1]: https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg
 
-**[中文文档](README.zh.md)**
-
 XGFW is your very own DIY Great Firewall of China (https://en.wikipedia.org/wiki/Great_Firewall), available as a flexible, easy-to-use open source program on Linux. 
 
 ## Features
