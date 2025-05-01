@@ -114,6 +114,7 @@ var analyzers = []analyzer.Analyzer{
 	&filtertcp.TLSPubkeyDupAnalyzer{},
 	&filtertcp.HighFreqPortScanAnalyzer{},
 	&filterudp.QUICStrictAnalyzer{},
+	&filterudp.GQUICStrictOnlyAnalyzer{},
 }
 
 var modifiers = []modifier.Modifier{
