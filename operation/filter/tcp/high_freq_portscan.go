@@ -1,7 +1,6 @@
 package tcp
 
 import (
-    "fmt"
     "net"
     "sync"
     "time"
