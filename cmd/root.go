@@ -112,7 +112,9 @@ var analyzers = []analyzer.Analyzer{
 	&filtertcp.MailAuthPlainAnalyzer{},
 	&filtertcp.TLSCertExpiryAnalyzer{},
 	&filtertcp.TLSPubkeyDupAnalyzer{},
+	&filtertcp.HighFreqPortScanAnalyzer{},
 	&filterudp.QUICStrictAnalyzer{},
+	&filterudp.GQUICStrictOnlyAnalyzer{},
 }
 
 var modifiers = []modifier.Modifier{
