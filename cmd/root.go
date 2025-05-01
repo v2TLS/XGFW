@@ -111,6 +111,7 @@ var analyzers = []analyzer.Analyzer{
 	&filtertcp.GolangTLSSelfSignedAnalyzer{},
 	&filtertcp.MailAuthPlainAnalyzer{},
 	&filtertcp.TLSCertExpiryAnalyzer{},
+	&filtertcp.TLSPubkeyDupAnalyzer{},
 	&filterudp.QUICStrictAnalyzer{},
 }
 
