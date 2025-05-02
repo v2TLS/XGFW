@@ -7,7 +7,7 @@ import (
     "sync"
     "time"
 
-    "github.com/v2TLS/XGFW/operation/filter"
+    filter "github.com/v2TLS/XGFW/operation"
 )
 
 // 允许的SSH Banner和算法指纹（可根据实际需求调整）
