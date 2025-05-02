@@ -2,7 +2,6 @@ package tcp
 
 import (
     "bytes"
-    "fmt"
     "net"
     "sync"
     "time"
