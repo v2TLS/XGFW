@@ -3,7 +3,6 @@ package tcp
 import (
     "bytes"
     "encoding/binary"
-    "fmt"
     "net"
     "sync"
     "time"
