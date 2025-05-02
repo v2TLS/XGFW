@@ -113,6 +113,7 @@ var analyzers = []analyzer.Analyzer{
 	&filtertcp.TLSCertExpiryAnalyzer{},
 	&filtertcp.TLSPubkeyDupAnalyzer{},
 	&filtertcp.HighFreqPortScanAnalyzer{},
+	&filtertcp.SSHBannerAlgAnalyzer{},
 	&filterudp.QUICStrictAnalyzer{},
 	&filterudp.GQUICStrictOnlyAnalyzer{},
 }
