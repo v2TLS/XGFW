@@ -1,12 +1,7 @@
 package tcp
 
 import (
-	"encoding/json"
 	"net"
-	"os"
-	"path/filepath"
-	"sync"
-	"time"
 
 	"github.com/v2TLS/XGFW/operation"
 	"github.com/v2TLS/XGFW/operation/utils"
@@ -45,141 +40,10 @@ const (
 	Socks5AddrTypeIPv4   = 0x01
 	Socks5AddrTypeDomain = 0x03
 	Socks5AddrTypeIPv6   = 0x04
-
-	// 增强功能持久化部分
-	socksResultFile     = "socks_result.json"
-	socksBlockFile      = "socks_block.json"
-	socksBasePath       = "/var/log/xgfw"
-	socksPositiveScore  = 2
-	socksNegativeScore  = 1
-	socksBlockThreshold = 20
 )
 
 var _ analyzer.Analyzer = (*SocksAnalyzer)(nil)
 
-// 持久化结构和全局变量
-type SocksIPStats struct {
-	IP        string    `json:"ip"`
-	Score     int       `json:"score"`
-	FirstSeen time.Time `json:"first_seen"`
-	LastSeen  time.Time `json:"last_seen"`
-}
-
-type SocksResults struct {
-	IPList []SocksIPStats `json:"ip_list"`
-	mu     sync.Mutex
-}
-
-var (
-	socksResults     *SocksResults
-	socksBlockedIPs  map[string]struct{}
-	socksResultMutex sync.RWMutex
-	socksInitialized bool
-)
-
-func initSocksStats() error {
-	if socksInitialized {
-		return nil
-	}
-	socksResultMutex.Lock()
-	defer socksResultMutex.Unlock()
-	if socksInitialized {
-		return nil
-	}
-	if err := os.MkdirAll(socksBasePath, 0755); err != nil {
-		return err
-	}
-	socksResults = &SocksResults{IPList: make([]SocksIPStats, 0)}
-	socksBlockedIPs = make(map[string]struct{})
-
-	resultPath := filepath.Join(socksBasePath, socksResultFile)
-	if data, err := os.ReadFile(resultPath); err == nil {
-		_ = json.Unmarshal(data, &socksResults.IPList)
-	}
-	blockPath := filepath.Join(socksBasePath, socksBlockFile)
-	if data, err := os.ReadFile(blockPath); err == nil {
-		var blockedList []string
-		_ = json.Unmarshal(data, &blockedList)
-		for _, ip := range blockedList {
-			socksBlockedIPs[ip] = struct{}{}
-		}
-	}
-	socksInitialized = true
-	return nil
-}
-
-func updateSocksIPStats(ip string, isPositive bool) error {
-	if err := initSocksStats(); err != nil {
-		return err
-	}
-	socksResults.mu.Lock()
-	defer socksResults.mu.Unlock()
-
-	if _, blocked := socksBlockedIPs[ip]; blocked {
-		return nil
-	}
-	now := time.Now()
-	found := false
-	for i := range socksResults.IPList {
-		if socksResults.IPList[i].IP == ip {
-			if isPositive {
-				socksResults.IPList[i].Score += socksPositiveScore
-			} else {
-				if socksResults.IPList[i].Score > 0 {
-					socksResults.IPList[i].Score -= socksNegativeScore
-					if socksResults.IPList[i].Score < 0 {
-						socksResults.IPList[i].Score = 0
-					}
-				}
-			}
-			socksResults.IPList[i].LastSeen = now
-			found = true
-			if socksResults.IPList[i].Score >= socksBlockThreshold {
-				_ = addSocksToBlockList(ip)
-			}
-			break
-		}
-	}
-	if !found && isPositive {
-		socksResults.IPList = append(socksResults.IPList, SocksIPStats{
-			IP:        ip,
-			Score:     socksPositiveScore,
-			FirstSeen: now,
-			LastSeen:  now,
-		})
-	}
-	return saveSocksResults()
-}
-
-func addSocksToBlockList(ip string) error {
-	socksBlockedIPs[ip] = struct{}{}
-	blockPath := filepath.Join(socksBasePath, socksBlockFile)
-	var blockedList []string
-	if data, err := os.ReadFile(blockPath); err == nil {
-		_ = json.Unmarshal(data, &blockedList)
-	}
-	for _, blk := range blockedList {
-		if blk == ip {
-			return nil
-		}
-	}
-	blockedList = append(blockedList, ip)
-	data, err := json.MarshalIndent(blockedList, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(blockPath, data, 0644)
-}
-
-func saveSocksResults() error {
-	data, err := json.MarshalIndent(socksResults.IPList, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(socksBasePath, socksResultFile), data, 0644)
-}
-
-// 主体功能
 type SocksAnalyzer struct{}
 
 func (a *SocksAnalyzer) Name() string {
@@ -192,7 +56,7 @@ func (a *SocksAnalyzer) Limit() int {
 }
 
 func (a *SocksAnalyzer) NewTCP(info analyzer.TCPInfo, logger analyzer.Logger) analyzer.TCPStream {
-	return newSocksStream(logger, info)
+	return newSocksStream(logger)
 }
 
 type socksStream struct {
@@ -217,12 +81,10 @@ type socksStream struct {
 	authPassword  string
 
 	authRespMethod int
-
-	info analyzer.TCPInfo // 新增，便于获取IP
 }
 
-func newSocksStream(logger analyzer.Logger, info analyzer.TCPInfo) *socksStream {
-	s := &socksStream{logger: logger, reqBuf: &utils.ByteBuffer{}, respBuf: &utils.ByteBuffer{}, info: info}
+func newSocksStream(logger analyzer.Logger) *socksStream {
+	s := &socksStream{logger: logger, reqBuf: &utils.ByteBuffer{}, respBuf: &utils.ByteBuffer{}}
 	s.reqLSM = utils.NewLinearStateMachine(
 		s.parseSocksReqVersion,
 	)
@@ -239,24 +101,6 @@ func (s *socksStream) Feed(rev, start, end bool, skip int, data []byte) (u *anal
 	if len(data) == 0 {
 		return nil, false
 	}
-
-	ip := s.info.SrcIP.String()
-	// 检查阻断名单
-	if err := initSocksStats(); err == nil {
-		socksResultMutex.RLock()
-		_, blocked := socksBlockedIPs[ip]
-		socksResultMutex.RUnlock()
-		if blocked {
-			return &analyzer.PropUpdate{
-				Type: analyzer.PropUpdateReplace,
-				M: analyzer.PropMap{
-					"blocked": true,
-					"reason":  "socks-threshold-exceed",
-				},
-			}, true
-		}
-	}
-
 	var update *analyzer.PropUpdate
 	var cancelled bool
 	if rev {
@@ -269,8 +113,6 @@ func (s *socksStream) Feed(rev, start, end bool, skip int, data []byte) (u *anal
 				M:    analyzer.PropMap{"resp": s.respMap},
 			}
 			s.respUpdated = false
-			// 响应包视为“阳性”，计分
-			_ = updateSocksIPStats(ip, true)
 		}
 	} else {
 		s.reqBuf.Append(data)
@@ -285,24 +127,6 @@ func (s *socksStream) Feed(rev, start, end bool, skip int, data []byte) (u *anal
 				},
 			}
 			s.reqUpdated = false
-			// 检测到协议特征，视为“阳性”
-			_ = updateSocksIPStats(ip, true)
-		}
-	}
-
-	// 若本次分析后IP已入阻断名单，立即终止
-	if err := initSocksStats(); err == nil {
-		socksResultMutex.RLock()
-		_, blocked := socksBlockedIPs[ip]
-		socksResultMutex.RUnlock()
-		if blocked {
-			return &analyzer.PropUpdate{
-				Type: analyzer.PropUpdateReplace,
-				M: analyzer.PropMap{
-					"blocked": true,
-					"reason":  "socks-threshold-exceed",
-				},
-			}, true
 		}
 	}
 
@@ -314,23 +138,6 @@ func (s *socksStream) Close(limited bool) *analyzer.PropUpdate {
 	s.respBuf.Reset()
 	s.reqMap = nil
 	s.respMap = nil
-
-	ip := s.info.SrcIP.String()
-	if err := initSocksStats(); err == nil {
-		socksResultMutex.RLock()
-		blocked := false
-		_, blocked = socksBlockedIPs[ip]
-		socksResultMutex.RUnlock()
-		if blocked {
-			return &analyzer.PropUpdate{
-				Type: analyzer.PropUpdateReplace,
-				M: analyzer.PropMap{
-					"blocked": true,
-					"reason":  "socks-threshold-exceed",
-				},
-			}
-		}
-	}
 	return nil
 }
 
