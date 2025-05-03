@@ -53,6 +53,7 @@ func (d *OnionooDirectory) Init() error {
 	if err != nil {
 		return err
 	}
+	count := 0
 	for _, relay := range response.Relays {
 		for _, address := range relay.OrAddresses {
 			ipStr, portStr, err := net.SplitHostPort(address)
@@ -63,10 +64,11 @@ func (d *OnionooDirectory) Init() error {
 			port, err := strconv.ParseUint(portStr, 10, 16)
 			if ip != nil && err == nil {
 				d.Add(ip, uint16(port))
+				count++
 			}
 		}
 	}
-	// TODO: log number of entries loaded
+	fmt.Printf("[onionoo] loaded %d relay entries\n", count)
 	return nil
 }
 
