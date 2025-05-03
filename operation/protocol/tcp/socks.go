@@ -30,9 +30,13 @@ const (
 	Socks5CmdTCPBind      = 0x02
 	Socks5CmdUDPAssociate = 0x03
 
-	Socks5AuthNotRequired      = 0x00
-	Socks5AuthPassword         = 0x02
-	Socks5AuthNoMatchingMethod = 0xFF
+	// SOCKS5 Authentication Methods (see IANA registry)
+	Socks5AuthNotRequired      = 0x00 // NO AUTHENTICATION REQUIRED
+	Socks5AuthGSSAPI           = 0x01 // GSSAPI
+	Socks5AuthPassword         = 0x02 // USERNAME/PASSWORD
+	// 0x03-0x7F: IANA ASSIGNED (future, historical, or vendor-specific)
+	Socks5AuthNoAcceptable     = 0xFF // NO ACCEPTABLE METHODS
+	Socks5AuthNoMatchingMethod = 0xFF // For internal use
 
 	Socks5AuthSuccess = 0x00
 	Socks5AuthFailure = 0x01
@@ -202,18 +206,35 @@ func (s *socksStream) parseSocks5ReqMethod() utils.LSMAction {
 		return utils.LSMActionPause
 	}
 
-	// For convenience, we only take the first method we can process
+	// 遍历所有method，找到第一个能支持的，或作为演示返回全部
 	s.authReqMethod = Socks5AuthNoMatchingMethod
 	for _, method := range methods[1:] {
 		switch method {
 		case Socks5AuthNotRequired:
 			s.authReqMethod = Socks5AuthNotRequired
 			return utils.LSMActionNext
+		case Socks5AuthGSSAPI:
+			s.authReqMethod = Socks5AuthGSSAPI
+			return utils.LSMActionNext
 		case Socks5AuthPassword:
 			s.authReqMethod = Socks5AuthPassword
 			return utils.LSMActionNext
 		default:
-			// TODO: more auth method to support
+			// 0x03-0x7F: IANA assigned (historical/extension/private)
+			if method >= 0x03 && method <= 0x7F {
+				s.authReqMethod = int(method)
+				return utils.LSMActionNext
+			}
+			// 0x80-0xFE: Private methods
+			if method >= 0x80 && method <= 0xFE {
+				s.authReqMethod = int(method)
+				return utils.LSMActionNext
+			}
+			// 0xFF: No acceptable methods
+			if method == 0xFF {
+				s.authReqMethod = Socks5AuthNoMatchingMethod
+				// 继续遍历
+			}
 		}
 	}
 	return utils.LSMActionNext
@@ -221,7 +242,8 @@ func (s *socksStream) parseSocks5ReqMethod() utils.LSMAction {
 
 func (s *socksStream) parseSocks5ReqAuth() utils.LSMAction {
 	switch s.authReqMethod {
-	case Socks5AuthNotRequired:
+	case Socks5AuthNotRequired, Socks5AuthGSSAPI:
+		// GSSAPI/无认证都直接通过
 		s.reqMap["auth"] = analyzer.PropMap{"method": s.authReqMethod}
 	case Socks5AuthPassword:
 		meta, ok := s.reqBuf.Get(2, false)
@@ -249,7 +271,8 @@ func (s *socksStream) parseSocks5ReqAuth() utils.LSMAction {
 			"password": s.authPassword,
 		}
 	default:
-		return utils.LSMActionCancel
+		// 其它认证方式（如IANA/私有/未来扩展），这里只记录method，不做实际认证
+		s.reqMap["auth"] = analyzer.PropMap{"method": s.authReqMethod}
 	}
 	s.reqUpdated = true
 	return utils.LSMActionNext
@@ -331,7 +354,7 @@ func (s *socksStream) parseSocks5RespMethod() utils.LSMAction {
 
 func (s *socksStream) parseSocks5RespAuth() utils.LSMAction {
 	switch s.authRespMethod {
-	case Socks5AuthNotRequired:
+	case Socks5AuthNotRequired, Socks5AuthGSSAPI:
 		s.respMap["auth"] = analyzer.PropMap{"method": s.authRespMethod}
 	case Socks5AuthPassword:
 		authResp, ok := s.respBuf.Get(2, true)
@@ -347,7 +370,8 @@ func (s *socksStream) parseSocks5RespAuth() utils.LSMAction {
 			"status": authStatus,
 		}
 	default:
-		return utils.LSMActionCancel
+		// 其它认证方式，仅记录method
+		s.respMap["auth"] = analyzer.PropMap{"method": s.authRespMethod}
 	}
 	s.respUpdated = true
 	return utils.LSMActionNext
