@@ -119,16 +119,25 @@ func (s *tlsStream) tlsClientHelloPreprocess() utils.LSMAction {
 		return utils.LSMActionCancel
 	}
 
-	// TODO: something is missing. See:
-	//   const messageHeaderSize = 4
-	//   fullMessageLen := int(header[3])<<8 | int(header[4])
-	//   msgNo := fullMessageLen / int(messageHeaderSize+s.serverHelloLen)
-	//   if msgNo != 1 {
-	// 	   // what here?
-	//   }
-	//   if messageNo != int(messageNo) {
-	// 	   // what here?
-	//   }
+	// --- TODO COMPLETION START ---
+	// Make sure the record length matches and only one handshake message is present.
+
+	const messageHeaderSize = 4 // handshake header: type(1) + len(3)
+	fullMessageLen := int(header[3])<<8 | int(header[4])
+	expectedTotalLen := messageHeaderSize + s.clientHelloLen
+
+	// Check if the record length matches the handshake message length exactly.
+	if fullMessageLen != expectedTotalLen {
+		// Likely fragmented or malformed, cancel
+		return utils.LSMActionCancel
+	}
+	// Only one handshake message should be present in this record
+	// (msgNo==1). If not, cancel.
+	msgNo := fullMessageLen / expectedTotalLen
+	if msgNo != 1 {
+		return utils.LSMActionCancel
+	}
+	// --- TODO COMPLETION END ---
 
 	return utils.LSMActionNext
 }
@@ -163,16 +172,25 @@ func (s *tlsStream) tlsServerHelloPreprocess() utils.LSMAction {
 		return utils.LSMActionCancel
 	}
 
-	// TODO: something is missing. See example:
-	//   const messageHeaderSize = 4
-	//   fullMessageLen := int(header[3])<<8 | int(header[4])
-	//   msgNo := fullMessageLen / int(messageHeaderSize+s.serverHelloLen)
-	//   if msgNo != 1 {
-	// 	   // what here?
-	//   }
-	//   if messageNo != int(messageNo) {
-	// 	   // what here?
-	//   }
+	// --- TODO COMPLETION START ---
+	// Make sure the record length matches and only one handshake message is present.
+
+	const messageHeaderSize = 4 // handshake header: type(1) + len(3)
+	fullMessageLen := int(header[3])<<8 | int(header[4])
+	expectedTotalLen := messageHeaderSize + s.serverHelloLen
+
+	// Check if the record length matches the handshake message length exactly.
+	if fullMessageLen != expectedTotalLen {
+		// Likely fragmented or malformed, cancel
+		return utils.LSMActionCancel
+	}
+	// Only one handshake message should be present in this record
+	// (msgNo==1). If not, cancel.
+	msgNo := fullMessageLen / expectedTotalLen
+	if msgNo != 1 {
+		return utils.LSMActionCancel
+	}
+	// --- TODO COMPLETION END ---
 
 	return utils.LSMActionNext
 }
