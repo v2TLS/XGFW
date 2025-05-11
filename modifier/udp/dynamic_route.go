@@ -61,21 +61,22 @@ type dynamicRouteInstance struct {
 	randSrc  *rand.Rand
 }
 
-var _ modifier.Modifier = (*DynamicRouteModifier)(nil)
+// UDP
+func (i *dynamicRouteInstance) Process(data []byte) ([]byte, error) {
+	return i.routeCommon(data, "udp")
+}
+
+// TCP
+func (i *dynamicRouteInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
+	return i.routeCommon(data, "tcp")
+}
+
+// 满足接口
 var _ modifier.UDPModifierInstance = (*dynamicRouteInstance)(nil)
 var _ modifier.TCPModifierInstance = (*dynamicRouteInstance)(nil)
+var _ modifier.Modifier = (*DynamicRouteModifier)(nil)
 
-// UDP实现
-func (i *dynamicRouteInstance) Process(data []byte) ([]byte, error) {
-	return i.routeAndSend(data, "udp")
-}
-
-// TCP实现
-func (i *dynamicRouteInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
-	return i.routeAndSend(data, "tcp")
-}
-
-func (i *dynamicRouteInstance) routeAndSend(data []byte, proto string) ([]byte, error) {
+func (i *dynamicRouteInstance) routeCommon(data []byte, proto string) ([]byte, error) {
 	idx := i.pickGatewayIndex()
 	gw := i.gateways[idx]
 	if gw.IP == "0.0.0.0" || gw.IP == "" {
