@@ -5,7 +5,7 @@ import (
 	"compress/gzip"
 	"io"
 
-	"github.com/pierrec/lz4/v4"
+	"github.com/pierrec.lz4/v4"
 	"github.com/klauspost/compress/zstd"
 
 	"github.com/v2TLS/XGFW/modifier"
@@ -17,7 +17,6 @@ func (m *CompressModifier) Name() string {
 	return "compress"
 }
 
-// 支持三种算法：gzip, lz4, zstd，模式：compress 或 decompress
 func (m *CompressModifier) New(args map[string]interface{}) (modifier.Instance, error) {
 	algo := "gzip"
 	if v, ok := args["algo"].(string); ok {
@@ -31,28 +30,42 @@ func (m *CompressModifier) New(args map[string]interface{}) (modifier.Instance, 
 			mode = v
 		}
 	}
-	return &compressModifierInstance{algo: algo, mode: mode}, nil
+	// 分别返回不同的实例
+	if atype, ok := args["type"].(string); ok && atype == "tcp" {
+		return &compressModifierTCPInstance{algo: algo, mode: mode}, nil
+	}
+	return &compressModifierUDPInstance{algo: algo, mode: mode}, nil
 }
 
-type compressModifierInstance struct {
-	algo string // "gzip", "lz4", "zstd"
-	mode string // "compress", "decompress"
+// UDP 实现
+type compressModifierUDPInstance struct {
+	algo string
+	mode string
 }
 
-var _ modifier.Modifier = (*CompressModifier)(nil)
-var _ modifier.UDPModifierInstance = (*compressModifierInstance)(nil)
-var _ modifier.TCPModifierInstance = (*compressModifierInstance)(nil)
+var _ modifier.UDPModifierInstance = (*compressModifierUDPInstance)(nil)
 
-// Unified Process for both UDP and TCP
-func (i *compressModifierInstance) Process(data []byte, direction bool) ([]byte, error) {
-	return i.processCompress(data)
+func (i *compressModifierUDPInstance) Process(data []byte) ([]byte, error) {
+	return processCompress(i.algo, i.mode, data)
 }
 
-// 实际压缩/解压逻辑
-func (i *compressModifierInstance) processCompress(data []byte) ([]byte, error) {
-	switch i.algo {
+// TCP 实现
+type compressModifierTCPInstance struct {
+	algo string
+	mode string
+}
+
+var _ modifier.TCPModifierInstance = (*compressModifierTCPInstance)(nil)
+
+func (i *compressModifierTCPInstance) Process(data []byte, direction bool) ([]byte, error) {
+	return processCompress(i.algo, i.mode, data)
+}
+
+// 公用逻辑
+func processCompress(algo, mode string, data []byte) ([]byte, error) {
+	switch algo {
 	case "gzip":
-		if i.mode == "compress" {
+		if mode == "compress" {
 			var buf bytes.Buffer
 			gz := gzip.NewWriter(&buf)
 			_, err := gz.Write(data)
@@ -63,7 +76,7 @@ func (i *compressModifierInstance) processCompress(data []byte) ([]byte, error) 
 				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			return buf.Bytes(), nil
-		} else if i.mode == "decompress" {
+		} else if mode == "decompress" {
 			buf := bytes.NewReader(data)
 			gz, err := gzip.NewReader(buf)
 			if err != nil {
@@ -77,7 +90,7 @@ func (i *compressModifierInstance) processCompress(data []byte) ([]byte, error) 
 			return out, nil
 		}
 	case "lz4":
-		if i.mode == "compress" {
+		if mode == "compress" {
 			var buf bytes.Buffer
 			lz4w := lz4.NewWriter(&buf)
 			_, err := lz4w.Write(data)
@@ -88,7 +101,7 @@ func (i *compressModifierInstance) processCompress(data []byte) ([]byte, error) 
 				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			return buf.Bytes(), nil
-		} else if i.mode == "decompress" {
+		} else if mode == "decompress" {
 			buf := bytes.NewReader(data)
 			lz4r := lz4.NewReader(buf)
 			out, err := io.ReadAll(lz4r)
@@ -98,7 +111,7 @@ func (i *compressModifierInstance) processCompress(data []byte) ([]byte, error) 
 			return out, nil
 		}
 	case "zstd":
-		if i.mode == "compress" {
+		if mode == "compress" {
 			var buf bytes.Buffer
 			enc, err := zstd.NewWriter(&buf)
 			if err != nil {
@@ -113,7 +126,7 @@ func (i *compressModifierInstance) processCompress(data []byte) ([]byte, error) 
 				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			return buf.Bytes(), nil
-		} else if i.mode == "decompress" {
+		} else if mode == "decompress" {
 			dec, err := zstd.NewReader(nil)
 			if err != nil {
 				return nil, &modifier.ErrInvalidPacket{Err: err}
