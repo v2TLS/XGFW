@@ -7,7 +7,6 @@ import (
 
 	"github.com/pierrec/lz4/v4"
 	"github.com/klauspost/compress/zstd"
-
 	"github.com/v2TLS/XGFW/modifier"
 )
 
@@ -17,7 +16,6 @@ func (m *CompressModifier) Name() string {
 	return "compress"
 }
 
-// 支持三种算法：gzip, lz4, zstd，模式：compress 或 decompress
 func (m *CompressModifier) New(args map[string]interface{}) (modifier.Instance, error) {
 	algo := "gzip"
 	if v, ok := args["algo"].(string); ok {
@@ -49,7 +47,6 @@ func (i *compressModifierInstance) ProcessTCP(data []byte, direction bool) ([]by
 	return i.processCommon(data)
 }
 
-// 满足接口要求
 var _ modifier.Modifier = (*CompressModifier)(nil)
 var _ modifier.UDPModifierInstance = (*compressModifierInstance)(nil)
 var _ modifier.TCPModifierInstance = (*compressModifierInstance)(nil)
