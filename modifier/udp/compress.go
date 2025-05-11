@@ -5,7 +5,7 @@ import (
 	"compress/gzip"
 	"io"
 
-	"github.com/pierrec.lz4/v4"
+	"github.com/pierrec/lz4/v4"
 	"github.com/klauspost/compress/zstd"
 
 	"github.com/v2TLS/XGFW/modifier"
