@@ -39,22 +39,22 @@ type compressModifierInstance struct {
 	mode string // "compress", "decompress"
 }
 
+// UDP接口实现
+func (i *compressModifierInstance) Process(data []byte) ([]byte, error) {
+	return i.processCommon(data)
+}
+
+// TCP接口实现
+func (i *compressModifierInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
+	return i.processCommon(data)
+}
+
+// 满足接口要求
 var _ modifier.Modifier = (*CompressModifier)(nil)
 var _ modifier.UDPModifierInstance = (*compressModifierInstance)(nil)
 var _ modifier.TCPModifierInstance = (*compressModifierInstance)(nil)
 
-// UDP实现
-func (i *compressModifierInstance) Process(data []byte) ([]byte, error) {
-	return i.processCompress(data)
-}
-
-// TCP实现
-func (i *compressModifierInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
-	return i.processCompress(data)
-}
-
-// 实际压缩/解压逻辑
-func (i *compressModifierInstance) processCompress(data []byte) ([]byte, error) {
+func (i *compressModifierInstance) processCommon(data []byte) ([]byte, error) {
 	switch i.algo {
 	case "gzip":
 		if i.mode == "compress" {
