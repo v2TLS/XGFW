@@ -15,6 +15,14 @@ type UDPModifierInstance interface {
 	Process(data []byte) ([]byte, error)
 }
 
+// 新增：TCPModifierInstance 接口
+type TCPModifierInstance interface {
+	Instance
+	// Process takes a TCP stream data and returns modified data.
+	// direction: true for client->server, false for server->client (可按需要用)
+	Process(data []byte, direction bool) ([]byte, error)
+}
+
 type ErrInvalidPacket struct {
 	Err error
 }
