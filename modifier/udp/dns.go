@@ -17,6 +17,8 @@ import (
 )
 
 var _ modifier.Modifier = (*DNSModifier)(nil)
+var _ modifier.UDPModifierInstance = (*dnsModifierInstance)(nil)
+var _ modifier.TCPModifierInstance = (*dnsModifierInstance)(nil)
 
 var (
 	errInvalidIP           = errors.New("invalid ip")
@@ -92,7 +94,7 @@ func (m *DNSModifier) parseIpListFile(filePath string, i *dnsModifierInstance) e
 
 func (m *DNSModifier) New(args map[string]interface{}) (modifier.Instance, error) {
 	i := &dnsModifierInstance{}
-	i.seed = rand.Uint32()
+	i.Seed = rand.Uint32()
 
 	for key, value := range args {
 		switch key {
@@ -121,15 +123,23 @@ func (m *DNSModifier) New(args map[string]interface{}) (modifier.Instance, error
 	return i, nil
 }
 
-var _ modifier.UDPModifierInstance = (*dnsModifierInstance)(nil)
-
 type dnsModifierInstance struct {
 	A    []net.IP
 	AAAA []net.IP
-	seed uint32
+	Seed uint32
 }
 
+// UDP实现
 func (i *dnsModifierInstance) Process(data []byte) ([]byte, error) {
+	return i.processDNS(data)
+}
+
+// TCP实现（完全复用UDP逻辑，实际场景很少，但为接口一致性而实现）
+func (i *dnsModifierInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
+	return i.processDNS(data)
+}
+
+func (i *dnsModifierInstance) processDNS(data []byte) ([]byte, error) {
 	dns := &layers.DNS{}
 	err := dns.DecodeFromBytes(data, gopacket.NilDecodeFeedback)
 	if err != nil {
@@ -142,8 +152,6 @@ func (i *dnsModifierInstance) Process(data []byte) ([]byte, error) {
 		return nil, &modifier.ErrInvalidPacket{Err: errEmptyDNSQuestion}
 	}
 
-	// Hash the query name so that DNS response is fixed for a given query.
-	// Use a random seed to avoid determinism.
 	hashStringToIndex := func(b []byte, sliceLength int, seed uint32) int {
 		h := fnv.New32a()
 		seedBytes := make([]byte, 4)
@@ -154,13 +162,11 @@ func (i *dnsModifierInstance) Process(data []byte) ([]byte, error) {
 		return int(hashValue % uint32(sliceLength))
 	}
 
-	// In practice, most if not all DNS clients only send one question
-	// per packet, so we don't care about the rest for now.
 	q := dns.Questions[0]
 	switch q.Type {
 	case layers.DNSTypeA:
 		if i.A != nil {
-			idx := hashStringToIndex(q.Name, len(i.A), i.seed)
+			idx := hashStringToIndex(q.Name, len(i.A), i.Seed)
 			dns.Answers = []layers.DNSResourceRecord{{
 				Name:  q.Name,
 				Type:  layers.DNSTypeA,
@@ -170,7 +176,7 @@ func (i *dnsModifierInstance) Process(data []byte) ([]byte, error) {
 		}
 	case layers.DNSTypeAAAA:
 		if i.AAAA != nil {
-			idx := hashStringToIndex(q.Name, len(i.AAAA), i.seed)
+			idx := hashStringToIndex(q.Name, len(i.AAAA), i.Seed)
 			dns.Answers = []layers.DNSResourceRecord{{
 				Name:  q.Name,
 				Type:  layers.DNSTypeAAAA,
@@ -179,7 +185,7 @@ func (i *dnsModifierInstance) Process(data []byte) ([]byte, error) {
 			}}
 		}
 	}
-	buf := gopacket.NewSerializeBuffer() // Modifiers must be safe for concurrent use, so we can't reuse the buffer
+	buf := gopacket.NewSerializeBuffer()
 	err = gopacket.SerializeLayers(buf, gopacket.SerializeOptions{
 		FixLengths:       true,
 		ComputeChecksums: true,

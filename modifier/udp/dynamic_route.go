@@ -4,20 +4,18 @@ import (
 	"errors"
 	"math/rand"
 	"net"
-	"time"
 	"strconv"
+	"time"
 
 	"github.com/v2TLS/XGFW/modifier"
 )
 
-// GatewayConfig 定义每个出口网关的配置
 type GatewayConfig struct {
 	IP      string
 	Port    int
 	Percent int // 分流百分比
 }
 
-// DynamicRouteModifier 支持按百分比动态分流到不同出口
 type DynamicRouteModifier struct{}
 
 func (m *DynamicRouteModifier) Name() string {
@@ -63,17 +61,29 @@ type dynamicRouteInstance struct {
 	randSrc  *rand.Rand
 }
 
-// Process: 按百分比选择网关，转发UDP包。如果IP为0.0.0.0则表示直接放行（不修改数据包）。
+var _ modifier.Modifier = (*DynamicRouteModifier)(nil)
+var _ modifier.UDPModifierInstance = (*dynamicRouteInstance)(nil)
+var _ modifier.TCPModifierInstance = (*dynamicRouteInstance)(nil)
+
+// UDP实现
 func (i *dynamicRouteInstance) Process(data []byte) ([]byte, error) {
+	return i.routeAndSend(data, "udp")
+}
+
+// TCP实现
+func (i *dynamicRouteInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
+	return i.routeAndSend(data, "tcp")
+}
+
+func (i *dynamicRouteInstance) routeAndSend(data []byte, proto string) ([]byte, error) {
 	idx := i.pickGatewayIndex()
 	gw := i.gateways[idx]
 	if gw.IP == "0.0.0.0" || gw.IP == "" {
 		// 0.0.0.0 表示直接放行
 		return data, nil
 	}
-	// 直接UDP发送到目标网关
 	addr := net.JoinHostPort(gw.IP, strconv.Itoa(gw.Port))
-	conn, err := net.Dial("udp", addr)
+	conn, err := net.Dial(proto, addr)
 	if err != nil {
 		return nil, &modifier.ErrInvalidPacket{Err: err}
 	}
@@ -86,7 +96,6 @@ func (i *dynamicRouteInstance) Process(data []byte) ([]byte, error) {
 	return nil, nil
 }
 
-// pickGatewayIndex 按百分比随机选一个网关
 func (i *dynamicRouteInstance) pickGatewayIndex() int {
 	r := i.randSrc.Intn(100)
 	acc := 0
@@ -98,7 +107,3 @@ func (i *dynamicRouteInstance) pickGatewayIndex() int {
 	}
 	return len(i.gateways) - 1
 }
-
-// 确保接口实现
-var _ modifier.Modifier = (*DynamicRouteModifier)(nil)
-var _ modifier.UDPModifierInstance = (*dynamicRouteInstance)(nil)

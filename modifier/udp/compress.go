@@ -39,7 +39,22 @@ type compressModifierInstance struct {
 	mode string // "compress", "decompress"
 }
 
+var _ modifier.Modifier = (*CompressModifier)(nil)
+var _ modifier.UDPModifierInstance = (*compressModifierInstance)(nil)
+var _ modifier.TCPModifierInstance = (*compressModifierInstance)(nil)
+
+// UDP实现
 func (i *compressModifierInstance) Process(data []byte) ([]byte, error) {
+	return i.processCompress(data)
+}
+
+// TCP实现
+func (i *compressModifierInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
+	return i.processCompress(data)
+}
+
+// 实际压缩/解压逻辑
+func (i *compressModifierInstance) processCompress(data []byte) ([]byte, error) {
 	switch i.algo {
 	case "gzip":
 		if i.mode == "compress" {
@@ -118,6 +133,3 @@ func (i *compressModifierInstance) Process(data []byte) ([]byte, error) {
 	}
 	return nil, &modifier.ErrInvalidArgs{Err: io.ErrUnexpectedEOF}
 }
-
-var _ modifier.Modifier = (*CompressModifier)(nil)
-var _ modifier.UDPModifierInstance = (*compressModifierInstance)(nil)
