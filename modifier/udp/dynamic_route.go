@@ -53,34 +53,43 @@ func (m *DynamicRouteModifier) New(args map[string]interface{}) (modifier.Instan
 	if total != 100 {
 		return nil, &modifier.ErrInvalidArgs{Err: errors.New("total percent must be 100")}
 	}
-	return &dynamicRouteInstance{gateways: gateways, randSrc: rand.New(rand.NewSource(time.Now().UnixNano()))}, nil
+	// 根据 type 返回 UDP 或 TCP 实例
+	if t, ok := args["type"].(string); ok && t == "tcp" {
+		return &dynamicRouteTCPInstance{gateways: gateways, randSrc: rand.New(rand.NewSource(time.Now().UnixNano()))}, nil
+	}
+	return &dynamicRouteUDPInstance{gateways: gateways, randSrc: rand.New(rand.NewSource(time.Now().UnixNano()))}, nil
 }
 
-type dynamicRouteInstance struct {
+// UDP 实现
+type dynamicRouteUDPInstance struct {
 	gateways []GatewayConfig
 	randSrc  *rand.Rand
 }
 
-var _ modifier.Modifier = (*DynamicRouteModifier)(nil)
-var _ modifier.UDPModifierInstance = (*dynamicRouteInstance)(nil)
-var _ modifier.TCPModifierInstance = (*dynamicRouteInstance)(nil)
+var _ modifier.UDPModifierInstance = (*dynamicRouteUDPInstance)(nil)
 
-// UDP实现
-func (i *dynamicRouteInstance) Process(data []byte) ([]byte, error) {
-	return i.routeAndSend(data, "udp")
+func (i *dynamicRouteUDPInstance) Process(data []byte) ([]byte, error) {
+	return routeAndSend(i.gateways, i.randSrc, data, "udp")
 }
 
-// TCP实现
-func (i *dynamicRouteInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
-	return i.routeAndSend(data, "tcp")
+// TCP 实现
+type dynamicRouteTCPInstance struct {
+	gateways []GatewayConfig
+	randSrc  *rand.Rand
 }
 
-func (i *dynamicRouteInstance) routeAndSend(data []byte, proto string) ([]byte, error) {
-	idx := i.pickGatewayIndex()
-	gw := i.gateways[idx]
+var _ modifier.TCPModifierInstance = (*dynamicRouteTCPInstance)(nil)
+
+func (i *dynamicRouteTCPInstance) Process(data []byte, direction bool) ([]byte, error) {
+	return routeAndSend(i.gateways, i.randSrc, data, "tcp")
+}
+
+// 公用逻辑
+func routeAndSend(gateways []GatewayConfig, randSrc *rand.Rand, data []byte, proto string) ([]byte, error) {
+	idx := pickGatewayIndex(gateways, randSrc)
+	gw := gateways[idx]
 	if gw.IP == "0.0.0.0" || gw.IP == "" {
-		// 0.0.0.0 表示直接放行
-		return data, nil
+		return data, nil // 直接放行
 	}
 	addr := net.JoinHostPort(gw.IP, strconv.Itoa(gw.Port))
 	conn, err := net.Dial(proto, addr)
@@ -92,18 +101,17 @@ func (i *dynamicRouteInstance) routeAndSend(data []byte, proto string) ([]byte, 
 	if err != nil {
 		return nil, &modifier.ErrInvalidPacket{Err: err}
 	}
-	// 返回空，表示本地不再转发到公网
 	return nil, nil
 }
 
-func (i *dynamicRouteInstance) pickGatewayIndex() int {
-	r := i.randSrc.Intn(100)
+func pickGatewayIndex(gateways []GatewayConfig, randSrc *rand.Rand) int {
+	r := randSrc.Intn(100)
 	acc := 0
-	for idx, gw := range i.gateways {
+	for idx, gw := range gateways {
 		acc += gw.Percent
 		if r < acc {
 			return idx
 		}
 	}
-	return len(i.gateways) - 1
+	return len(gateways) - 1
 }
