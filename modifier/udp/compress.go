@@ -1,4 +1,4 @@
-package modifier
+package udp
 
 import (
 	"bytes"
@@ -7,16 +7,18 @@ import (
 
 	"github.com/pierrec/lz4/v4"
 	"github.com/klauspost/compress/zstd"
+
+	"github.com/v2TLS/XGFW/modifier"
 )
 
-// 支持三种算法：gzip, lz4, zstd，模式：compress 或 decompress
 type CompressModifier struct{}
 
 func (m *CompressModifier) Name() string {
 	return "compress"
 }
 
-func (m *CompressModifier) New(args map[string]interface{}) (Instance, error) {
+// 支持三种算法：gzip, lz4, zstd，模式：compress 或 decompress
+func (m *CompressModifier) New(args map[string]interface{}) (modifier.Instance, error) {
 	algo := "gzip"
 	if v, ok := args["algo"].(string); ok {
 		if v == "gzip" || v == "lz4" || v == "zstd" {
@@ -37,18 +39,22 @@ type compressModifierInstance struct {
 	mode string // "compress", "decompress"
 }
 
+var _ modifier.Modifier = (*CompressModifier)(nil)
+var _ modifier.UDPModifierInstance = (*compressModifierInstance)(nil)
+var _ modifier.TCPModifierInstance = (*compressModifierInstance)(nil)
+
 // UDP实现
 func (i *compressModifierInstance) Process(data []byte) ([]byte, error) {
-	return i.do(data)
+	return i.processCompress(data)
 }
 
 // TCP实现
 func (i *compressModifierInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
-	return i.do(data)
+	return i.processCompress(data)
 }
 
-// 实际处理
-func (i *compressModifierInstance) do(data []byte) ([]byte, error) {
+// 实际压缩/解压逻辑
+func (i *compressModifierInstance) processCompress(data []byte) ([]byte, error) {
 	switch i.algo {
 	case "gzip":
 		if i.mode == "compress" {
@@ -56,22 +62,22 @@ func (i *compressModifierInstance) do(data []byte) ([]byte, error) {
 			gz := gzip.NewWriter(&buf)
 			_, err := gz.Write(data)
 			if err != nil {
-				return nil, &ErrInvalidPacket{Err: err}
+				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			if err := gz.Close(); err != nil {
-				return nil, &ErrInvalidPacket{Err: err}
+				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			return buf.Bytes(), nil
 		} else if i.mode == "decompress" {
 			buf := bytes.NewReader(data)
 			gz, err := gzip.NewReader(buf)
 			if err != nil {
-				return nil, &ErrInvalidPacket{Err: err}
+				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			defer gz.Close()
 			out, err := io.ReadAll(gz)
 			if err != nil {
-				return nil, &ErrInvalidPacket{Err: err}
+				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			return out, nil
 		}
@@ -81,10 +87,10 @@ func (i *compressModifierInstance) do(data []byte) ([]byte, error) {
 			lz4w := lz4.NewWriter(&buf)
 			_, err := lz4w.Write(data)
 			if err != nil {
-				return nil, &ErrInvalidPacket{Err: err}
+				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			if err := lz4w.Close(); err != nil {
-				return nil, &ErrInvalidPacket{Err: err}
+				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			return buf.Bytes(), nil
 		} else if i.mode == "decompress" {
@@ -92,7 +98,7 @@ func (i *compressModifierInstance) do(data []byte) ([]byte, error) {
 			lz4r := lz4.NewReader(buf)
 			out, err := io.ReadAll(lz4r)
 			if err != nil {
-				return nil, &ErrInvalidPacket{Err: err}
+				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			return out, nil
 		}
@@ -101,33 +107,29 @@ func (i *compressModifierInstance) do(data []byte) ([]byte, error) {
 			var buf bytes.Buffer
 			enc, err := zstd.NewWriter(&buf)
 			if err != nil {
-				return nil, &ErrInvalidPacket{Err: err}
+				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			_, err = enc.Write(data)
 			if err != nil {
 				enc.Close()
-				return nil, &ErrInvalidPacket{Err: err}
+				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			if err := enc.Close(); err != nil {
-				return nil, &ErrInvalidPacket{Err: err}
+				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			return buf.Bytes(), nil
 		} else if i.mode == "decompress" {
 			dec, err := zstd.NewReader(nil)
 			if err != nil {
-				return nil, &ErrInvalidPacket{Err: err}
+				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			defer dec.Close()
 			out, err := dec.DecodeAll(data, nil)
 			if err != nil {
-				return nil, &ErrInvalidPacket{Err: err}
+				return nil, &modifier.ErrInvalidPacket{Err: err}
 			}
 			return out, nil
 		}
 	}
-	return nil, &ErrInvalidArgs{Err: io.ErrUnexpectedEOF}
+	return nil, &modifier.ErrInvalidArgs{Err: io.ErrUnexpectedEOF}
 }
-
-var _ Modifier = (*CompressModifier)(nil)
-var _ UDPModifierInstance = (*compressModifierInstance)(nil)
-var _ TCPModifierInstance = (*compressModifierInstance)(nil)
