@@ -71,7 +71,7 @@ func (i *dynamicRouteInstance) Process(data []byte) ([]byte, error) {
 		return data, nil
 	}
 	// 直接UDP发送到目标网关
-	addr := net.JoinHostPort(i.ip, strconv.Itoa(i.port))
+	addr := net.JoinHostPort(gw.ip, strconv.Itoa(gw.port))
 	conn, err := net.Dial("udp", addr)
 	if err != nil {
 		return nil, &modifier.ErrInvalidPacket{Err: err}
