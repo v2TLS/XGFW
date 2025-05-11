@@ -131,15 +131,15 @@ type dnsModifierInstance struct {
 
 // UDP实现
 func (i *dnsModifierInstance) Process(data []byte) ([]byte, error) {
-	return i.processDNS(data)
+	return i.processCommon(data)
 }
 
-// TCP实现（完全复用UDP逻辑，实际场景很少，但为接口一致性而实现）
+// TCP实现
 func (i *dnsModifierInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
-	return i.processDNS(data)
+	return i.processCommon(data)
 }
 
-func (i *dnsModifierInstance) processDNS(data []byte) ([]byte, error) {
+func (i *dnsModifierInstance) processCommon(data []byte) ([]byte, error) {
 	dns := &layers.DNS{}
 	err := dns.DecodeFromBytes(data, gopacket.NilDecodeFeedback)
 	if err != nil {
@@ -152,6 +152,7 @@ func (i *dnsModifierInstance) processDNS(data []byte) ([]byte, error) {
 		return nil, &modifier.ErrInvalidPacket{Err: errEmptyDNSQuestion}
 	}
 
+	// Hash the query name so that DNS response is fixed for a given query.
 	hashStringToIndex := func(b []byte, sliceLength int, seed uint32) int {
 		h := fnv.New32a()
 		seedBytes := make([]byte, 4)
