@@ -17,7 +17,6 @@ func (m *CompressModifier) Name() string {
 	return "compress"
 }
 
-// 支持三种算法：gzip, lz4, zstd，模式：compress 或 decompress
 func (m *CompressModifier) New(args map[string]interface{}) (modifier.Instance, error) {
 	algo := "gzip"
 	if v, ok := args["algo"].(string); ok {
@@ -47,6 +46,31 @@ func (i *compressModifierInstance) Process(data []byte) ([]byte, error) {
 // TCP接口实现
 func (i *compressModifierInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
 	return i.processCommon(data)
+}
+
+// 满足TCPModifierInstance接口要求
+func (i *compressModifierInstance) ProcessWithDirection(data []byte, direction bool) ([]byte, error) {
+	return i.ProcessTCP(data, direction)
+}
+
+// 让ProcessWithDirection满足接口
+func (i *compressModifierInstance) ProcessDataWithDirection(data []byte, direction bool) ([]byte, error) {
+	return i.ProcessTCP(data, direction)
+}
+
+// 让Process匹配TCPModifierInstance接口（必须有这个方法！）
+func (i *compressModifierInstance) ProcessData(data []byte, direction bool) ([]byte, error) {
+	return i.ProcessTCP(data, direction)
+}
+
+// 实现接口：Process(data []byte, direction bool) ([]byte, error)
+func (i *compressModifierInstance) ProcessDirection(data []byte, direction bool) ([]byte, error) {
+	return i.ProcessTCP(data, direction)
+}
+
+// 或者（建议）直接加如下实现（Go允许重复定义，编译器只认最后那个！）
+func (i *compressModifierInstance) Process(data []byte, direction bool) ([]byte, error) {
+	return i.ProcessTCP(data, direction)
 }
 
 // 满足接口要求
