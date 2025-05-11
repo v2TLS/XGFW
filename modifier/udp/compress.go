@@ -42,7 +42,7 @@ func (i *compressModifierInstance) Process(data []byte) ([]byte, error) {
 	return i.processCommon(data)
 }
 
-// TCP接口实现
+// TCP接口实现（多了 direction 参数）
 func (i *compressModifierInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
 	return i.processCommon(data)
 }
