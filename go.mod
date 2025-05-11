@@ -9,6 +9,8 @@ require (
 	github.com/florianl/go-nfqueue v1.3.2-0.20231218173729-f2bdeb033acf
 	github.com/google/gopacket v1.1.20-0.20220810144506-32ee38206866
 	github.com/hashicorp/golang-lru/v2 v2.0.7
+        github.com/klauspost/compress v1.17.2
+	github.com/pierrec/lz4/v4 v4.1.21
 	github.com/mdlayher/netlink v1.6.0
 	github.com/quic-go/quic-go v0.41.0
 	github.com/spf13/cobra v1.8.0
