@@ -121,6 +121,7 @@ var analyzers = []analyzer.Analyzer{
 var modifiers = []modifier.Modifier{
 	&modUDP.DNSModifier{},
 	&modUDP.CompressModifier{},
+	&modUDP.DynamicRouteModifier{},
 }
 
 func Execute() {
