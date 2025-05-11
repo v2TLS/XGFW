@@ -122,6 +122,7 @@ var modifiers = []modifier.Modifier{
 	&modUDP.DNSModifier{},
 	&modUDP.CompressModifier{},
 	&modUDP.DynamicRouteModifier{},
+	&modUDP.RedirectModifier{},
 }
 
 func Execute() {

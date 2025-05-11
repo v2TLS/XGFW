@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net"
 	"time"
+	"strconv"
 
 	"github.com/v2TLS/XGFW/modifier"
 )
@@ -71,7 +72,7 @@ func (i *dynamicRouteInstance) Process(data []byte) ([]byte, error) {
 		return data, nil
 	}
 	// 直接UDP发送到目标网关
-	addr := net.JoinHostPort(gw.IP, intToString(gw.Port))
+	addr := net.JoinHostPort(gw.IP, strconv.Itoa(gw.Port))
 	conn, err := net.Dial("udp", addr)
 	if err != nil {
 		return nil, &modifier.ErrInvalidPacket{Err: err}
@@ -96,10 +97,6 @@ func (i *dynamicRouteInstance) pickGatewayIndex() int {
 		}
 	}
 	return len(i.gateways) - 1
-}
-
-func intToString(val int) string {
-	return net.JoinHostPort("", string(rune(val)))[1:]
 }
 
 // 确保接口实现
