@@ -184,6 +184,26 @@ func (s *tcpStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Ass
 	// TODO: 这里如果需要将data传递到后续write流程，需要确保用的是被修改后的data
 }
 
+// 修改feedEntry参数类型为bool，避免类型错误
+func (s *tcpStream) feedEntry(entry *tcpStreamEntry, rev, start, end bool, skip int, data []byte) (update *analyzer.PropUpdate, closeUpdate *analyzer.PropUpdate, done bool) {
+	if !entry.HasLimit {
+		update, done = entry.Stream.Feed(rev, start, end, skip, data)
+	} else {
+		qData := data
+		if len(qData) > entry.Quota {
+			qData = qData[:entry.Quota]
+		}
+		update, done = entry.Stream.Feed(rev, start, end, skip, qData)
+		entry.Quota -= len(qData)
+		if entry.Quota <= 0 {
+			// Quota exhausted, signal close & move to doneEntries
+			closeUpdate = entry.Stream.Close(true)
+			done = true
+		}
+	}
+	return
+}
+
 func (s *tcpStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
 	s.closeActiveEntries()
 	return true
@@ -202,25 +222,6 @@ func (s *tcpStream) closeActiveEntries() {
 	}
 	s.doneEntries = append(s.doneEntries, s.activeEntries...)
 	s.activeEntries = nil
-}
-
-func (s *tcpStream) feedEntry(entry *tcpStreamEntry, rev, start, end, skip int, data []byte) (update *analyzer.PropUpdate, closeUpdate *analyzer.PropUpdate, done bool) {
-	if !entry.HasLimit {
-		update, done = entry.Stream.Feed(rev != 0, start != 0, end != 0, skip, data)
-	} else {
-		qData := data
-		if len(qData) > entry.Quota {
-			qData = qData[:entry.Quota]
-		}
-		update, done = entry.Stream.Feed(rev != 0, start != 0, end != 0, skip, qData)
-		entry.Quota -= len(qData)
-		if entry.Quota <= 0 {
-			// Quota exhausted, signal close & move to doneEntries
-			closeUpdate = entry.Stream.Close(true)
-			done = true
-		}
-	}
-	return
 }
 
 func analyzersToTCPAnalyzers(ans []analyzer.Analyzer) []analyzer.TCPAnalyzer {
