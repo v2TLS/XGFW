@@ -1,10 +1,12 @@
-package modifier
+package udp
 
 import (
 	"errors"
 	"fmt"
 	"net"
 	"time"
+
+	"github.com/v2TLS/XGFW/modifier"
 )
 
 // RedirectModifier 用于将 UDP/TCP 包或流转发到指定IP和端口
