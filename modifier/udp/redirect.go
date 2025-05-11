@@ -3,6 +3,7 @@ package udp
 import (
 	"errors"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/v2TLS/XGFW/modifier"
@@ -43,8 +44,8 @@ type redirectModifierInstance struct {
 
 // Process 将收到的数据转发到目标IP和端口，不修改数据内容
 func (i *redirectModifierInstance) Process(data []byte) ([]byte, error) {
-	addr := net.JoinHostPort(i.ip, intToString(i.port))
-	conn, err := net.DialTimeout("udp", addr, i.timeout)
+    addr := net.JoinHostPort(i.ip, strconv.Itoa(i.port))
+    conn, err := net.DialTimeout("udp", addr, i.timeout)
 	if err != nil {
 		return nil, &modifier.ErrInvalidPacket{Err: err}
 	}
@@ -55,10 +56,6 @@ func (i *redirectModifierInstance) Process(data []byte) ([]byte, error) {
 	}
 	// 返回 nil 表示本地不再转发到原目标
 	return nil, nil
-}
-
-func intToString(val int) string {
-	return net.JoinHostPort("", string(rune(val)))[1:]
 }
 
 var _ modifier.Modifier = (*RedirectModifier)(nil)
