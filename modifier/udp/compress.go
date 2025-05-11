@@ -7,6 +7,7 @@ import (
 
 	"github.com/pierrec/lz4/v4"
 	"github.com/klauspost/compress/zstd"
+
 	"github.com/v2TLS/XGFW/modifier"
 )
 
@@ -16,6 +17,7 @@ func (m *CompressModifier) Name() string {
 	return "compress"
 }
 
+// 支持三种算法：gzip, lz4, zstd，模式：compress 或 decompress
 func (m *CompressModifier) New(args map[string]interface{}) (modifier.Instance, error) {
 	algo := "gzip"
 	if v, ok := args["algo"].(string); ok {
@@ -37,21 +39,17 @@ type compressModifierInstance struct {
 	mode string // "compress", "decompress"
 }
 
-// UDP接口实现
-func (i *compressModifierInstance) Process(data []byte) ([]byte, error) {
-	return i.processCommon(data)
-}
-
-// TCP接口实现（多了 direction 参数）
-func (i *compressModifierInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
-	return i.processCommon(data)
-}
-
 var _ modifier.Modifier = (*CompressModifier)(nil)
 var _ modifier.UDPModifierInstance = (*compressModifierInstance)(nil)
 var _ modifier.TCPModifierInstance = (*compressModifierInstance)(nil)
 
-func (i *compressModifierInstance) processCommon(data []byte) ([]byte, error) {
+// Unified Process for both UDP and TCP
+func (i *compressModifierInstance) Process(data []byte, direction bool) ([]byte, error) {
+	return i.processCompress(data)
+}
+
+// 实际压缩/解压逻辑
+func (i *compressModifierInstance) processCompress(data []byte) ([]byte, error) {
 	switch i.algo {
 	case "gzip":
 		if i.mode == "compress" {
