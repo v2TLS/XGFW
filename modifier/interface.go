@@ -20,7 +20,7 @@ type TCPModifierInstance interface {
 	Instance
 	// Process takes a TCP stream data and returns modified data.
 	// direction: true for client->server, false for server->client (可按需要用)
-	Process(data []byte) ([]byte, error)
+	Process(data []byte, direction bool) ([]byte, error)
 }
 
 type ErrInvalidPacket struct {
