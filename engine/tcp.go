@@ -7,6 +7,7 @@ import (
 	"github.com/v2TLS/XGFW/operation"
 	"github.com/v2TLS/XGFW/io"
 	"github.com/v2TLS/XGFW/ruleset"
+	"github.com/v2TLS/XGFW/modifier"
 
 	"github.com/bwmarrin/snowflake"
 	"github.com/google/gopacket"
@@ -144,12 +145,26 @@ func (s *tcpStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Ass
 		}
 	}
 	ctx := ac.(*tcpContext)
+	// ====== MODIFY 支持 START ======
 	if updated || s.virgin {
 		s.virgin = false
 		s.logger.TCPStreamPropUpdate(s.info, false)
 		// Match properties against ruleset
 		result := s.ruleset.Match(s.info)
 		action := result.Action
+		if action == ruleset.ActionModify {
+			tcpMI, ok := result.ModInstance.(modifier.TCPModifierInstance)
+			if ok && tcpMI != nil {
+				newData, err := tcpMI.Process(data, !rev)
+				if err == nil && len(newData) > 0 {
+					data = newData
+				} else if err != nil {
+					s.logger.ModifyError(s.info, err)
+				}
+			} else {
+				s.logger.ModifyError(s.info, errInvalidModifier)
+			}
+		}
 		if action != ruleset.ActionMaybe && action != ruleset.ActionModify {
 			verdict := actionToTCPVerdict(action)
 			s.lastVerdict = verdict
@@ -159,12 +174,14 @@ func (s *tcpStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Ass
 			s.closeActiveEntries()
 		}
 	}
+	// ====== MODIFY 支持 END ======
 	if len(s.activeEntries) == 0 && ctx.Verdict == tcpVerdictAccept {
 		// All entries are done but no verdict issued, accept stream
 		s.lastVerdict = tcpVerdictAcceptStream
 		ctx.Verdict = tcpVerdictAcceptStream
 		s.logger.TCPStreamAction(s.info, ruleset.ActionAllow, true)
 	}
+	// TODO: 这里如果需要将data传递到后续write流程，需要确保用的是被修改后的data
 }
 
 func (s *tcpStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
@@ -187,15 +204,15 @@ func (s *tcpStream) closeActiveEntries() {
 	s.activeEntries = nil
 }
 
-func (s *tcpStream) feedEntry(entry *tcpStreamEntry, rev, start, end bool, skip int, data []byte) (update *analyzer.PropUpdate, closeUpdate *analyzer.PropUpdate, done bool) {
+func (s *tcpStream) feedEntry(entry *tcpStreamEntry, rev, start, end, skip int, data []byte) (update *analyzer.PropUpdate, closeUpdate *analyzer.PropUpdate, done bool) {
 	if !entry.HasLimit {
-		update, done = entry.Stream.Feed(rev, start, end, skip, data)
+		update, done = entry.Stream.Feed(rev != 0, start != 0, end != 0, skip, data)
 	} else {
 		qData := data
 		if len(qData) > entry.Quota {
 			qData = qData[:entry.Quota]
 		}
-		update, done = entry.Stream.Feed(rev, start, end, skip, qData)
+		update, done = entry.Stream.Feed(rev != 0, start != 0, end != 0, skip, qData)
 		entry.Quota -= len(qData)
 		if entry.Quota <= 0 {
 			// Quota exhausted, signal close & move to doneEntries
