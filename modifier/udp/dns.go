@@ -1,4 +1,4 @@
-package modifier
+package udp
 
 import (
 	"bufio"
@@ -10,63 +10,54 @@ import (
 	"net"
 	"os"
 
+	"github.com/v2TLS/XGFW/modifier"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )
 
-// 只支持UDP，TCP流量不处理，直接返回原始数据
+var _ modifier.Modifier = (*DNSModifier)(nil)
+var _ modifier.UDPModifierInstance = (*dnsModifierInstance)(nil)
+var _ modifier.TCPModifierInstance = (*dnsModifierInstance)(nil)
+
+var (
+	errInvalidIP           = errors.New("invalid ip")
+	errInvalidIPList       = errors.New("invalid ip list")
+	errInvalidIpListFile   = errors.New("unable to open or parse ip list file")
+	errNotValidDNSResponse = errors.New("not a valid dns response")
+	errEmptyDNSQuestion    = errors.New("empty dns question")
+)
+
+func fmtErrInvalidIP(ip string) error {
+	return fmt.Errorf("invalid ip: %s", ip)
+}
+
+func fmtErrInvalidIpListFile(filePath string) error {
+	return fmt.Errorf("unable to open or parse ip list file: %s", filePath)
+}
+
 type DNSModifier struct{}
 
 func (m *DNSModifier) Name() string {
 	return "dns"
 }
 
-func (m *DNSModifier) New(args map[string]interface{}) (Instance, error) {
-	i := &dnsModifierInstance{}
-	i.seed = rand.Uint32()
-
-	for key, value := range args {
-		switch key {
-		case "a", "aaaa":
-			if err := m.parseIpEntry(value, i); err != nil {
-				return nil, err
-			}
-		case "list":
-			if list, ok := value.([]interface{}); ok {
-				if err := m.parseIpList(list, i); err != nil {
-					return nil, err
-				}
-			} else {
-				return nil, &ErrInvalidArgs{Err: errors.New("invalid ip list")}
-			}
-		case "file":
-			if filePath, ok := value.(string); ok {
-				if err := m.parseIpListFile(filePath, i); err != nil {
-					return nil, err
-				}
-			} else {
-				return nil, &ErrInvalidArgs{Err: errors.New("unable to open or parse ip list file")}
-			}
-		}
-	}
-	return i, nil
-}
-
 func (m *DNSModifier) parseIpEntry(entry interface{}, i *dnsModifierInstance) error {
 	entryStr, ok := entry.(string)
 	if !ok {
-		return &ErrInvalidArgs{Err: errors.New("invalid ip")}
+		return &modifier.ErrInvalidArgs{Err: errInvalidIP}
 	}
 
 	ip := net.ParseIP(entryStr)
 	if ip == nil {
-		return &ErrInvalidArgs{Err: fmt.Errorf("invalid ip: %s", entryStr)}
+		return &modifier.ErrInvalidArgs{Err: fmtErrInvalidIP(entryStr)}
 	}
 	if ip4 := ip.To4(); ip4 != nil {
 		i.A = append(i.A, ip4)
 	} else {
 		i.AAAA = append(i.AAAA, ip)
 	}
+
 	return nil
 }
 
@@ -82,7 +73,7 @@ func (m *DNSModifier) parseIpList(list []interface{}, i *dnsModifierInstance) er
 func (m *DNSModifier) parseIpListFile(filePath string, i *dnsModifierInstance) error {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return &ErrInvalidArgs{Err: fmt.Errorf("unable to open or parse ip list file: %s", filePath)}
+		return &modifier.ErrInvalidArgs{Err: fmtErrInvalidIpListFile(filePath)}
 	}
 	defer file.Close()
 
@@ -93,33 +84,74 @@ func (m *DNSModifier) parseIpListFile(filePath string, i *dnsModifierInstance) e
 			return err
 		}
 	}
+
 	if err := scanner.Err(); err != nil {
-		return &ErrInvalidArgs{Err: fmt.Errorf("unable to open or parse ip list file: %s", filePath)}
+		return &modifier.ErrInvalidArgs{Err: fmtErrInvalidIpListFile(filePath)}
 	}
+
 	return nil
+}
+
+func (m *DNSModifier) New(args map[string]interface{}) (modifier.Instance, error) {
+	i := &dnsModifierInstance{}
+	i.Seed = rand.Uint32()
+
+	for key, value := range args {
+		switch key {
+		case "a", "aaaa":
+			if err := m.parseIpEntry(value, i); err != nil {
+				return nil, err
+			}
+		case "list":
+			if list, ok := value.([]interface{}); ok {
+				if err := m.parseIpList(list, i); err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, &modifier.ErrInvalidArgs{Err: errInvalidIPList}
+			}
+		case "file":
+			if filePath, ok := value.(string); ok {
+				if err := m.parseIpListFile(filePath, i); err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, &modifier.ErrInvalidArgs{Err: errInvalidIpListFile}
+			}
+		}
+	}
+	return i, nil
 }
 
 type dnsModifierInstance struct {
 	A    []net.IP
 	AAAA []net.IP
-	seed uint32
+	Seed uint32
 }
 
 // UDP实现
 func (i *dnsModifierInstance) Process(data []byte) ([]byte, error) {
+	return i.processDNS(data)
+}
+
+// TCP实现（完全复用UDP逻辑，实际场景很少，但为接口一致性而实现）
+func (i *dnsModifierInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
+	return i.processDNS(data)
+}
+
+func (i *dnsModifierInstance) processDNS(data []byte) ([]byte, error) {
 	dns := &layers.DNS{}
 	err := dns.DecodeFromBytes(data, gopacket.NilDecodeFeedback)
 	if err != nil {
-		return nil, &ErrInvalidPacket{Err: err}
+		return nil, &modifier.ErrInvalidPacket{Err: err}
 	}
 	if !dns.QR || dns.ResponseCode != layers.DNSResponseCodeNoErr {
-		return nil, &ErrInvalidPacket{Err: errors.New("not a valid dns response")}
+		return nil, &modifier.ErrInvalidPacket{Err: errNotValidDNSResponse}
 	}
 	if len(dns.Questions) == 0 {
-		return nil, &ErrInvalidPacket{Err: errors.New("empty dns question")}
+		return nil, &modifier.ErrInvalidPacket{Err: errEmptyDNSQuestion}
 	}
 
-	// Hash the query name so that DNS response is fixed for a given query.
 	hashStringToIndex := func(b []byte, sliceLength int, seed uint32) int {
 		h := fnv.New32a()
 		seedBytes := make([]byte, 4)
@@ -134,7 +166,7 @@ func (i *dnsModifierInstance) Process(data []byte) ([]byte, error) {
 	switch q.Type {
 	case layers.DNSTypeA:
 		if i.A != nil {
-			idx := hashStringToIndex(q.Name, len(i.A), i.seed)
+			idx := hashStringToIndex(q.Name, len(i.A), i.Seed)
 			dns.Answers = []layers.DNSResourceRecord{{
 				Name:  q.Name,
 				Type:  layers.DNSTypeA,
@@ -144,7 +176,7 @@ func (i *dnsModifierInstance) Process(data []byte) ([]byte, error) {
 		}
 	case layers.DNSTypeAAAA:
 		if i.AAAA != nil {
-			idx := hashStringToIndex(q.Name, len(i.AAAA), i.seed)
+			idx := hashStringToIndex(q.Name, len(i.AAAA), i.Seed)
 			dns.Answers = []layers.DNSResourceRecord{{
 				Name:  q.Name,
 				Type:  layers.DNSTypeAAAA,
@@ -160,12 +192,3 @@ func (i *dnsModifierInstance) Process(data []byte) ([]byte, error) {
 	}, dns)
 	return buf.Bytes(), err
 }
-
-// TCP实现(原样返回，不处理)
-func (i *dnsModifierInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
-	return data, nil
-}
-
-var _ Modifier = (*DNSModifier)(nil)
-var _ UDPModifierInstance = (*dnsModifierInstance)(nil)
-var _ TCPModifierInstance = (*dnsModifierInstance)(nil)
