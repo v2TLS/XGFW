@@ -32,17 +32,22 @@ func (m *RedirectModifier) New(args map[string]interface{}) (modifier.Instance, 
 	} else if tf, ok := args["timeout"].(float64); ok && tf > 0 {
 		timeout = time.Duration(int(tf)) * time.Second
 	}
-	return &redirectModifierInstance{ip: ip, port: port, timeout: timeout}, nil
+	if tp, ok := args["type"].(string); ok && tp == "tcp" {
+		return &redirectTCPInstance{ip: ip, port: port, timeout: timeout}, nil
+	}
+	return &redirectUDPInstance{ip: ip, port: port, timeout: timeout}, nil
 }
 
-type redirectModifierInstance struct {
+// UDP实现
+type redirectUDPInstance struct {
 	ip      string
 	port    int
 	timeout time.Duration
 }
 
-// UDP实现
-func (i *redirectModifierInstance) Process(data []byte) ([]byte, error) {
+var _ modifier.UDPModifierInstance = (*redirectUDPInstance)(nil)
+
+func (i *redirectUDPInstance) Process(data []byte) ([]byte, error) {
 	addr := net.JoinHostPort(i.ip, itoa(i.port))
 	conn, err := net.DialTimeout("udp", addr, i.timeout)
 	if err != nil {
@@ -57,7 +62,15 @@ func (i *redirectModifierInstance) Process(data []byte) ([]byte, error) {
 }
 
 // TCP实现
-func (i *redirectModifierInstance) ProcessTCP(data []byte, direction bool) ([]byte, error) {
+type redirectTCPInstance struct {
+	ip      string
+	port    int
+	timeout time.Duration
+}
+
+var _ modifier.TCPModifierInstance = (*redirectTCPInstance)(nil)
+
+func (i *redirectTCPInstance) Process(data []byte, direction bool) ([]byte, error) {
 	addr := net.JoinHostPort(i.ip, itoa(i.port))
 	conn, err := net.DialTimeout("tcp", addr, i.timeout)
 	if err != nil {
@@ -74,7 +87,3 @@ func (i *redirectModifierInstance) ProcessTCP(data []byte, direction bool) ([]by
 func itoa(i int) string {
 	return fmt.Sprintf("%d", i)
 }
-
-var _ modifier.Modifier = (*RedirectModifier)(nil)
-var _ modifier.UDPModifierInstance = (*redirectModifierInstance)(nil)
-var _ modifier.TCPModifierInstance = (*redirectModifierInstance)(nil)
