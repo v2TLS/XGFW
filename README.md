@@ -2,7 +2,7 @@
 
 [![Quality check status](https://github.com/v2TLS/XGFW/actions/workflows/check.yaml/badge.svg)](https://github.com/v2TLS/XGFW/actions/workflows/check.yaml)
 
-XGFW is your very own DIY Great Firewall of China (https://en.wikipedia.org/wiki/Great_Firewall), available as a flexible, easy-to-use open source program on Linux. 
+As a fork of OpenGFW, XGFW is your very own DIY Great Firewall of China (https://en.wikipedia.org/wiki/Great_Firewall), available as a flexible, easy-to-use open source program on Linux. 
 
 ## Features
 
